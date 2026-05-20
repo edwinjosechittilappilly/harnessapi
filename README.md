@@ -7,6 +7,7 @@
 [![PyPI version](https://img.shields.io/pypi/v/harnessapi.svg)](https://pypi.org/project/harnessapi/)
 [![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
+
 [![Built on FastAPI](https://img.shields.io/badge/built%20on-FastAPI-009688?logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com)
 [![Powered by FastMCP](https://img.shields.io/badge/powered%20by-FastMCP-6f42c1)](https://github.com/jlowin/fastmcp)
 [![agentskills.io compatible](https://img.shields.io/badge/agentskills.io-compatible-orange)](https://agentskills.io)
