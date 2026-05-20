@@ -1,32 +1,11 @@
 ---
-title: harnessapi
-description: Python framework to build streaming APIs and MCP tools from skill folders. Write a skill. Get an API. Get an MCP tool. Ship.
-template: splash
-hero:
-  tagline: Write a skill. Get an API. Get an MCP tool. Ship.
-  actions:
-    - text: Quick start
-      link: /guides/quickstart/
-      icon: right-arrow
-      variant: primary
-    - text: View on GitHub
-      link: https://github.com/edwinjosechittilappilly/harnessapi
-      icon: external
-      variant: minimal
+title: Introduction
+description: harnessapi — Python framework for building streaming APIs and MCP tools from skill folders.
 ---
 
-import { Card, CardGrid, LinkCard, Badge } from '@astrojs/starlight/components';
-
-<div style="text-align:center; margin: 0.5rem 0 2rem;">
-  <Badge text="v0.1.4" variant="tip" />
-  <Badge text="Python 3.11+" variant="note" />
-  <Badge text="MIT License" variant="success" />
-</div>
-
-**harnessapi** is a Python framework that turns a skill folder into a **streaming HTTP API** and a **Model Context Protocol (MCP) tool** — simultaneously, automatically, with zero boilerplate.
+**harnessapi** turns a skill folder into a streaming HTTP API and an MCP tool — simultaneously, with no routes, no decorators, and no separate server to maintain.
 
 ```bash
-# Try it instantly — no install needed
 uvx harnessapi init my-project
 cd my-project
 uvx harnessapi run
@@ -40,41 +19,37 @@ curl -X POST http://localhost:8000/skills/greet \
 # → {"message": "Hello, world! Welcome to harnessapi.", "length": 36}
 ```
 
----
-
-## What you get from one skill folder
-
-<CardGrid>
-  <Card title="Streaming HTTP endpoint" icon="rocket">
-    `POST /skills/{name}` — Server-Sent Events by default, plain JSON via `Accept` header. No routes to write.
-  </Card>
-  <Card title="MCP tool" icon="puzzle">
-    Every skill is automatically registered as a Model Context Protocol tool at `/mcp`. Plug into Claude Desktop, Cursor, or any agent in seconds.
-  </Card>
-  <Card title="OpenAPI docs" icon="document">
-    Full Swagger UI at `/docs` — generated from your Pydantic models. Zero extra configuration.
-  </Card>
-  <Card title="agentskills.io compatible" icon="approve-check">
-    Existing skill folders with `SKILL.md` are detected automatically. harnessapi is a superset of the agentskills.io standard.
-  </Card>
-</CardGrid>
+Your skill is live at three places simultaneously: `POST /skills/greet` (HTTP endpoint), `/mcp` (MCP tool), and `/docs` (Swagger UI).
 
 ---
 
-## Works with the tools you already use
+## When to use harnessapi
 
-<CardGrid>
-  <LinkCard title="Claude Desktop" description="Add your skills as MCP tools with one line of JSON config." href="/guides/claude-desktop/" />
-  <LinkCard title="Cursor" description="Connect your MCP server to Cursor and call skills from the AI chat." href="/guides/claude-desktop/#cursor" />
-  <LinkCard title="FastAPI ecosystem" description="harnessapi is a FastAPI subclass — all middleware, auth, and plugins work." href="/concepts/skill-folders/" />
-  <LinkCard title="agentskills.io" description="Convert existing skill folders with a single CLI command." href="/guides/convert-skill/" />
-</CardGrid>
+- Exposing Python functions as **streaming API endpoints** (Server-Sent Events)
+- Building tools for **Claude Desktop, Cursor, or any MCP client**
+- Converting an **agentskills.io** skill folder into a production API
+- Shipping an LLM-powered microservice without FastAPI boilerplate
 
 ---
 
-## Built on
+## Core idea
 
-- [FastAPI](https://fastapi.tiangolo.com) — the HTTP layer
-- [FastMCP](https://github.com/jlowin/fastmcp) — the MCP server
-- [Pydantic](https://docs.pydantic.dev) — input/output validation
-- [uv](https://docs.astral.sh/uv/) — packaging and CLI
+Write a skill folder with two required files:
+
+```
+skills/greet/
+├── models.py    ← Pydantic Input + Output
+└── handler.py   ← async handle() function
+```
+
+harnessapi discovers it at startup and registers it as both an HTTP endpoint and an MCP tool. Add more folders — get more endpoints and tools.
+
+---
+
+## Next steps
+
+- [Quick start](/guides/quickstart/) — running project in 60 seconds
+- [Skill folders](/concepts/skill-folders/) — full folder structure reference  
+- [Streaming (SSE)](/concepts/streaming/) — return vs yield, JSON mode
+- [MCP tools](/concepts/mcp/) — connecting to Claude Desktop and Cursor
+- [Examples](/examples/factorial/) — real skill implementations

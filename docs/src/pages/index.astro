@@ -59,9 +59,7 @@ const b = import.meta.env.BASE_URL.replace(/\/$/, '');
     </a>
     <nav class="nav-links">
       <a href="#drop">Drop</a>
-      <a href="#api">API</a>
-      <a href="#mcp">MCP</a>
-      <a href="#quickstart">Start</a>
+      <a href="#quickstart">Run</a>
       <a href={`${b}/guides/quickstart/`}>Docs</a>
     </nav>
     <a href="https://github.com/edwinjosechittilappilly/harnessapi" target="_blank" rel="noopener" class="nav-icon" aria-label="GitHub">
@@ -148,130 +146,76 @@ const b = import.meta.env.BASE_URL.replace(/\/$/, '');
   </div>
 </section>
 
-<!-- ── 01 DROP ───────────────────────────────────────────────── -->
-<section class="story" id="drop">
+<!-- ── TWO STEPS ───────────────────────────────────────────────── -->
+<section class="steps-section" id="features">
   <div class="container">
-    <span class="eyebrow-v2 fade-in">01 — Drop</span>
-    <h2 class="display center narrow fade-in">
-      Drop a folder.<br/>
-      <span class="grad">That's it.</span>
-    </h2>
-    <p class="lede center fade-in">
-      Three files. No decorators. No routes. No registration.
-    </p>
-    <div class="story-figure fade-in">
-      <div class="folder-card">
-        <div class="fc-title">skills / summarize</div>
-        <div class="file-row">
-          <span class="ic"></span>
-          <span class="fname">models.py</span>
-          <span class="note">Input + Output</span>
+
+    <div class="steps-grid">
+
+      <!-- Step 1: Drop -->
+      <div class="step-card fade-in" id="drop">
+        <div class="step-meta">
+          <span class="step-num">01</span>
+          <span class="step-sep">/</span>
+          <span class="step-label">Drop</span>
         </div>
-        <div class="file-row">
-          <span class="ic"></span>
-          <span class="fname">handler.py</span>
-          <span class="note">Your logic</span>
+        <h2 class="step-title">One folder.<br/>Three files.</h2>
+        <p class="step-desc">No routes, no decorators, no registration. Drop a folder — harnessapi discovers it at startup.</p>
+        <div class="step-cmd">
+          <span class="step-prompt">$</span>
+          <span>uvx harnessapi <span class="step-flag">--skill</span> ./summarize</span>
         </div>
-        <div class="file-row">
-          <span class="ic"></span>
-          <span class="fname">skill.toml</span>
-          <span class="note">Metadata · optional</span>
+        <div class="step-filelist">
+          <div class="step-file">
+            <span class="step-file-icon"></span>
+            <span class="step-file-name">models.py</span>
+            <span class="step-file-note">Input + Output</span>
+          </div>
+          <div class="step-file">
+            <span class="step-file-icon"></span>
+            <span class="step-file-name">handler.py</span>
+            <span class="step-file-note">Your logic</span>
+          </div>
+          <div class="step-file">
+            <span class="step-file-icon step-file-icon--opt"></span>
+            <span class="step-file-name">skill.toml</span>
+            <span class="step-file-note">Optional</span>
+          </div>
         </div>
       </div>
-    </div>
-  </div>
-</section>
 
-<!-- ── 02 API ────────────────────────────────────────────────── -->
-<section class="story" id="api">
-  <div class="container">
-    <span class="eyebrow-v2 fade-in">02 — API</span>
-    <h2 class="display center narrow fade-in">
-      Streams.<br/>
-      <span class="grad">By default.</span>
-    </h2>
-    <p class="lede center fade-in">
-      Server-Sent Events out of the box. Plain JSON with one header. Same handler.
-    </p>
-    <div class="story-figure fade-in">
-      <div class="api-card">
-        <span class="api-row"><span class="api-prompt">$</span> curl -X POST http://localhost:8000/skills/greet \</span>
-        <span class="api-row">&nbsp;&nbsp;&nbsp;&nbsp;-d '<span class="api-out">&#123;"name": "world"&#125;</span>'</span>
-        <div class="api-div"></div>
-        <span class="api-row"><span class="api-ev">event:</span> chunk</span>
-        <span class="api-row"><span class="api-ev">data:</span> Hello,</span>
-        <span class="api-row">&nbsp;</span>
-        <span class="api-row"><span class="api-ev">event:</span> chunk</span>
-        <span class="api-row"><span class="api-ev">data:</span> world!</span>
-        <span class="api-row">&nbsp;</span>
-        <span class="api-row"><span class="api-ev">event:</span> done</span>
-      </div>
-    </div>
-  </div>
-</section>
-
-<!-- ── 03 MCP (dark) ─────────────────────────────────────────── -->
-<section class="dark story" id="mcp">
-  <div class="container" style="position:relative;">
-    <span class="eyebrow-v2 fade-in">03 — MCP-native</span>
-    <h2 class="display center narrow fade-in">
-      Every skill,<br/>
-      <span class="grad">a tool.</span>
-    </h2>
-    <p class="lede center fade-in">
-      Mount once. Claude Desktop, Cursor, and Copilot discover every folder — automatically.
-    </p>
-    <div class="story-figure fade-in">
-      <div class="code-window-v2">
-        <div class="cw-head">
-          <div class="cw-lights"><span></span><span></span><span></span></div>
-          <div class="cw-filename">claude_desktop_config.json</div>
+      <!-- Step 2: Run -->
+      <div class="step-card step-card--dark fade-in" id="quickstart">
+        <div class="step-meta">
+          <span class="step-num">02</span>
+          <span class="step-sep">/</span>
+          <span class="step-label">Run</span>
         </div>
-        <pre><span class="mp">&#123;</span>
-  <span class="mk">"mcpServers"</span><span class="mp">:</span> <span class="mp">&#123;</span>
-    <span class="mk">"my-skills"</span><span class="mp">:</span> <span class="mp">&#123;</span>
-      <span class="mk">"url"</span><span class="mp">:</span> <span class="ms">"http://localhost:8000/mcp"</span>
-    <span class="mp">&#125;</span>
-  <span class="mp">&#125;</span>
-<span class="mp">&#125;</span></pre>
-      </div>
-    </div>
-  </div>
-</section>
-
-<!-- ── 04 QUICKSTART ─────────────────────────────────────────── -->
-<section class="story" id="quickstart" style="padding-bottom: 11rem;">
-  <div class="container" style="position:relative;">
-    <span class="eyebrow-v2 fade-in">04 — Ship</span>
-    <h2 class="display center narrow fade-in">
-      Three files.<br/>
-      <span class="grad">Sixty seconds.</span>
-    </h2>
-    <p class="lede center fade-in">
-      A working server, an MCP endpoint, and OpenAPI docs — from the time you finish typing.
-    </p>
-
-    <div class="cw-tabs fade-in" id="qs-tabs">
-      <button class="cw-tab" data-tab="0">models.py</button>
-      <button class="cw-tab active" data-tab="1">handler.py</button>
-      <button class="cw-tab" data-tab="2">main.py</button>
-    </div>
-
-    <div class="fade-in">
-      <div class="code-window-v2">
-        <div class="cw-head">
-          <div class="cw-lights"><span></span><span></span><span></span></div>
-          <div class="cw-filename" id="qs-filename">handler.py</div>
+        <h2 class="step-title">One command.<br/>Live everywhere.</h2>
+        <p class="step-desc">HTTP endpoint, MCP tool, and OpenAPI docs — all up the moment you run.</p>
+        <div class="step-cmd">
+          <span class="step-prompt">$</span>
+          <span>uvx harnessapi run</span>
         </div>
-        <pre id="qs-code"><span class="kw">from</span> .models <span class="kw">import</span> <span class="typ">Input</span>, <span class="typ">Output</span>
-
-<span class="kw">async def</span> <span class="fn">handle</span>(input: <span class="typ">Input</span>) -&gt; <span class="typ">Output</span>:
-    <span class="kw">return</span> <span class="typ">Output</span>(
-        summary=input.text[:input.max_length],
-    )
-
-<span class="com"># or yield to stream — same endpoint</span></pre>
+        <div class="step-surfaces">
+          <div class="step-surface">
+            <span class="step-badge step-badge--post">POST</span>
+            <span class="step-path">/skills/&#123;name&#125;</span>
+            <span class="step-surface-note">HTTP · SSE stream</span>
+          </div>
+          <div class="step-surface">
+            <span class="step-badge step-badge--mcp">MCP</span>
+            <span class="step-path">/mcp</span>
+            <span class="step-surface-note">Claude · Cursor · Copilot</span>
+          </div>
+          <div class="step-surface">
+            <span class="step-badge step-badge--get">GET</span>
+            <span class="step-path">/docs</span>
+            <span class="step-surface-note">Swagger UI</span>
+          </div>
+        </div>
       </div>
+
     </div>
   </div>
 </section>
