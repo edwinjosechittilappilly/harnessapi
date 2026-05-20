@@ -2,22 +2,30 @@
 
 # harnessapi
 
-**Write a skill. Get an API. Get an MCP tool. Ship.**
+### Write a skill. Get an API. Get an MCP tool. Ship.
 
 [![PyPI version](https://img.shields.io/pypi/v/harnessapi.svg)](https://pypi.org/project/harnessapi/)
 [![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 
+[![Built on FastAPI](https://img.shields.io/badge/built%20on-FastAPI-009688?logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com)
+[![Powered by FastMCP](https://img.shields.io/badge/powered%20by-FastMCP-6f42c1)](https://github.com/jlowin/fastmcp)
+[![agentskills.io compatible](https://img.shields.io/badge/agentskills.io-compatible-orange)](https://agentskills.io)
+
 </div>
 
 ---
 
-You write one Python function. `harnessapi` gives you:
+One folder. Two files. You get a **streaming HTTP endpoint**, an **MCP tool**, and **interactive docs** — without writing a single route, decorator, or server config.
 
-- **A streaming HTTP endpoint** at `POST /skills/{name}` — Server-Sent Events out of the box
-- **An MCP tool** at `/mcp` — plug straight into Claude Desktop, Cursor, Copilot, or any agent
+```
+skills/summarize/
+├── models.py    ← define input & output
+├── handler.py   ← write your logic
+└── skill.toml   ← name, description, tags, timeout
+```
 
-No routers. No decorators scattered across files. No separate MCP server to maintain. Just a folder with two files.
+That's the whole model. Drop the folder. Run the server. Done.
 
 ---
 
@@ -30,15 +38,6 @@ uv add harnessapi
 ---
 
 ## 60-second start
-
-```
-my_project/
-├── main.py
-└── skills/
-    └── summarize/
-        ├── models.py
-        └── handler.py
-```
 
 **`skills/summarize/models.py`**
 ```python
@@ -54,11 +53,19 @@ class Output(SkillOutput):
 
 **`skills/summarize/handler.py`**
 ```python
-"""Summarize text to a target length."""
 from .models import Input, Output
 
 async def handle(input: Input) -> Output:
     return Output(summary=input.text[:input.max_length])
+```
+
+**`skills/summarize/skill.toml`**
+```toml
+[skill]
+description  = "Summarize text to a target length"
+is_mcp       = true
+tags         = ["text"]
+timeout_secs = 30
 ```
 
 **`main.py`**
@@ -70,29 +77,35 @@ app = HarnessAPI(skills_dir=Path(__file__).parent / "skills")
 ```
 
 ```bash
-uvicorn main:app --reload
+harnessapi run
 ```
 
-That's it. Your skill is live at `POST /skills/summarize` **and** available as an MCP tool at `http://localhost:8000/mcp`.
+Your skill is now live at three places simultaneously:
+
+| | |
+|---|---|
+| `POST /skills/summarize` | HTTP endpoint — SSE streaming by default |
+| `GET /docs` | Interactive OpenAPI docs |
+| `http://localhost:8000/mcp` | MCP server — ready for Claude, Cursor, Copilot |
 
 ---
 
-## Streaming is the default
+## Streaming — just use `yield`
 
-Return a value → one clean JSON response. Use `yield` → stream chunks to the client as they're produced.
+Return a value for a single response. Use `yield` to stream chunks as they're produced. Same endpoint, no extra config.
 
 ```python
-# Non-streaming
+# One-shot
 async def handle(input: Input) -> Output:
     return Output(result=compute(input))
 
-# Streaming — just yield
+# Streaming
 async def handle(input: Input):
     async for token in llm.stream(input.prompt):
         yield token
 ```
 
-Clients get standard Server-Sent Events:
+Clients receive standard Server-Sent Events:
 
 ```
 event: chunk
@@ -105,13 +118,13 @@ event: done
 data:
 ```
 
-Need plain JSON instead? Add `Accept: application/json` to your request. Same endpoint, no configuration.
+Want plain JSON? Add `Accept: application/json`. Same endpoint, same code — harnessapi collects the chunks and returns them together.
 
 ---
 
-## Every skill is also an MCP tool
+## Every skill is an MCP tool
 
-Add `harnessapi` to Claude Desktop in 10 seconds:
+Connect any MCP client in seconds:
 
 ```json
 {
@@ -123,13 +136,31 @@ Add `harnessapi` to Claude Desktop in 10 seconds:
 }
 ```
 
-Every skill you define automatically appears as a tool your agent can call. Add a skill folder, restart the server — it's there.
+Every skill you add is automatically registered as a tool. Add a folder, restart — it appears. No registration code. No schema maintenance.
 
 ---
 
-## Try it: streaming factorial
+## Scaffold in one command
 
-Clone the repo and run the built-in example:
+```bash
+# New project with a sample skill
+harnessapi init my-project
+
+# Add API layer to an existing agentskills.io skill
+harnessapi init --skill .agents/skills/summarize
+
+# Convert a whole skills directory
+harnessapi init --skills-dir .agents/skills
+
+# Wrap a plain Python function as a skill
+harnessapi init --function utils/compute.py --output skills
+```
+
+harnessapi is a compatible superset of the [agentskills.io](https://agentskills.io) standard — your existing skill folders work as-is.
+
+---
+
+## See it live: streaming factorial
 
 ```bash
 git clone https://github.com/edwinjosechittilappilly/harnessapi
@@ -137,8 +168,6 @@ cd harnessapi
 uv sync
 uv run uvicorn examples.factorial_app.main:app --reload
 ```
-
-Watch 5! computed step-by-step over SSE:
 
 ```bash
 curl -X POST http://localhost:8000/skills/factorial \
@@ -166,19 +195,6 @@ event: done
 data:
 ```
 
-Or get it all at once:
-
-```bash
-curl -X POST http://localhost:8000/skills/factorial \
-  -H "Content-Type: application/json" \
-  -H "Accept: application/json" \
-  -d '{"n": 5}'
-```
-
-```json
-{"chunks": ["start: 1", "2: 2", "3: 6", "4: 24", "5: 120"]}
-```
-
 ---
 
 ## Skill folder reference
@@ -186,51 +202,30 @@ curl -X POST http://localhost:8000/skills/factorial \
 ```
 skills/
 └── my_skill/
-    ├── handler.py        # required — your logic lives here
-    ├── models.py         # required — Pydantic Input + Output
-    ├── skill.toml        # optional — name, description, tags, timeout
+    ├── handler.py        ← required: your logic
+    ├── models.py         ← required: Pydantic Input + Output
+    ├── SKILL.md          ← optional: agentskills.io compatible metadata
+    ├── skill.toml        ← optional: name, description, tags, timeout
     ├── defaults/
-    │   └── input.json    # optional — shown as example in /docs
+    │   └── input.json    ← optional: default values shown in /docs
     └── examples/
-        └── 01.json       # optional — {input, output} pairs for docs
+        └── 01.json       ← optional: {input, output} pairs for docs
 ```
 
 **`skill.toml`**
 ```toml
 [skill]
 description  = "What this skill does"
-is_mcp       = true      # default: true — set false to hide from MCP
+is_mcp       = true      # set false to hide from MCP
 tags         = ["nlp"]
 timeout_secs = 30
 ```
 
 ---
 
-## Prefer decorators? That works too.
-
-```python
-from harnessapi import HarnessAPI, SkillInput, SkillOutput, skill
-
-class TranslateInput(SkillInput):
-    text: str
-    target_lang: str = "es"
-
-class TranslateOutput(SkillOutput):
-    translated: str
-
-@skill(name="translate", input_model=TranslateInput, output_model=TranslateOutput)
-async def translate(input: TranslateInput) -> TranslateOutput:
-    # call your translation API here
-    return TranslateOutput(translated=f"[{input.target_lang}] {input.text}")
-
-app = HarnessAPI(title="My Skills")
-```
-
----
-
 ## Hot-swap handlers at runtime
 
-Need to tweak a skill without restarting? Enable the edit endpoint and push new code over HTTP:
+Patch a skill without restarting the server:
 
 ```python
 app = HarnessAPI(skills_dir="./skills", enable_edit_endpoints=True)
@@ -242,29 +237,30 @@ curl -X POST http://localhost:8000/skills/summarize/edit \
   -d '{"source_code": "async def handle(input):\n    return Output(summary=input.text.upper())", "persist": true}'
 ```
 
-> Disabled by default. Protect with auth middleware before exposing in production.
+> Disabled by default. Add auth middleware before enabling in production.
 
 ---
 
-## What you get out of the box
+## What you get
 
-| Feature | Details |
+| | |
 |---|---|
-| HTTP endpoint | `POST /skills/{name}` for every skill |
-| Streaming | SSE by default, JSON fallback via `Accept` header |
-| MCP server | `/mcp` — all skills auto-registered as tools |
-| OpenAPI docs | `/docs` — full interactive Swagger UI |
-| Pydantic validation | Input validated before your handler is called |
+| HTTP endpoint | `POST /skills/{name}` for every skill, automatically |
+| Streaming | SSE by default · JSON via `Accept: application/json` |
+| MCP server | `/mcp` · all skills auto-registered as tools |
+| OpenAPI docs | `/docs` · full Swagger UI, no extra setup |
+| Validation | Pydantic — invalid input is rejected before your code runs |
 | Timeouts | Per-skill `timeout_secs` in `skill.toml` |
-| Hot-swap | Opt-in edit endpoint for runtime handler replacement |
+| Hot-swap | Runtime handler replacement via opt-in edit endpoint |
+| agentskills.io | Drop-in compatible — existing skill folders just work |
 
 ---
 
 ## Philosophy
 
-Most API frameworks start with routes. Most agent frameworks start with tools. `harnessapi` starts with **skills** — self-contained units of capability that are both, automatically.
+Most frameworks start with routes. Most agent frameworks start with tools. `harnessapi` starts with **skills** — the capability itself. The API and the MCP tool are consequences, not configuration.
 
-Drop a folder. Define input and output. Everything else is handled.
+Write the thing. Everything else follows.
 
 ---
 
