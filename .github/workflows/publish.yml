@@ -6,15 +6,15 @@ on:
       - "v*"
 
 jobs:
-  build-and-publish:
+  publish:
     runs-on: ubuntu-latest
     permissions:
-      contents: write  # needed to create GitHub releases
+      contents: write
 
     steps:
       - uses: actions/checkout@v4
         with:
-          fetch-depth: 0  # full history so gh can generate release notes
+          fetch-depth: 0
 
       - name: Install uv
         uses: astral-sh/setup-uv@v4
@@ -31,9 +31,15 @@ jobs:
           UV_PUBLISH_TOKEN: ${{ secrets.UV_PUBLISH_TOKEN }}
 
       - name: Create GitHub Release
+        if: always()  # create release even if PyPI publish step is skipped/retried
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          gh release create "${{ github.ref_name }}" dist/* \
-            --title "${{ github.ref_name }}" \
-            --generate-notes
+          # Skip if release already exists (e.g. re-run after partial failure)
+          if gh release view "${{ github.ref_name }}" > /dev/null 2>&1; then
+            echo "Release ${{ github.ref_name }} already exists, skipping."
+          else
+            gh release create "${{ github.ref_name }}" dist/* \
+              --title "${{ github.ref_name }}" \
+              --generate-notes
+          fi

@@ -16,7 +16,10 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          fetch-depth: 0  # need full history to check existing tags
+          fetch-depth: 0
+          # Use a PAT if available so the pushed tag triggers publish.yml.
+          # Fall back to GITHUB_TOKEN (tag is created but won't re-trigger workflows).
+          token: ${{ secrets.GH_PAT || secrets.GITHUB_TOKEN }}
 
       - name: Read version from pyproject.toml
         id: version
