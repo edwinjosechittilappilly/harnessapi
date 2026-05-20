@@ -17,7 +17,8 @@ One folder. Two files. You get a **streaming HTTP endpoint**, an **MCP tool**, a
 ```
 skills/summarize/
 ├── models.py    ← define input & output
-└── handler.py   ← write your logic
+├── handler.py   ← write your logic
+└── skill.toml   ← name, description, tags, timeout
 ```
 
 That's the whole model. Drop the folder. Run the server. Done.
@@ -52,6 +53,15 @@ from .models import Input, Output
 
 async def handle(input: Input) -> Output:
     return Output(summary=input.text[:input.max_length])
+```
+
+**`skills/summarize/skill.toml`**
+```toml
+[skill]
+description  = "Summarize text to a target length"
+is_mcp       = true
+tags         = ["text"]
+timeout_secs = 30
 ```
 
 **`main.py`**
