@@ -1,10 +1,23 @@
+<div align="center">
+
 # harnessapi
 
-**Skill-first API framework** — define a skill once, get both an HTTP endpoint and an MCP tool automatically.
+**Write a skill. Get an API. Get an MCP tool. Ship.**
 
-Every skill is a folder. Drop in a `handler.py` and `models.py` and you have:
-- `POST /skills/{name}` — streaming SSE by default, JSON on request
-- An MCP tool at `/mcp` — ready for Claude Desktop, Cursor, or any MCP client
+[![PyPI version](https://img.shields.io/pypi/v/harnessapi.svg)](https://pypi.org/project/harnessapi/)
+[![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
+
+</div>
+
+---
+
+You write one Python function. `harnessapi` gives you:
+
+- **A streaming HTTP endpoint** at `POST /skills/{name}` — Server-Sent Events out of the box
+- **An MCP tool** at `/mcp` — plug straight into Claude Desktop, Cursor, Copilot, or any agent
+
+No routers. No decorators scattered across files. No separate MCP server to maintain. Just a folder with two files.
 
 ---
 
@@ -14,47 +27,38 @@ Every skill is a folder. Drop in a `handler.py` and `models.py` and you have:
 uv add harnessapi
 ```
 
-Or clone and run locally:
-
-```bash
-git clone <repo>
-cd harnessapi
-uv sync
-```
-
 ---
 
-## Quickstart
-
-Create your skill folder:
+## 60-second start
 
 ```
 my_project/
 ├── main.py
 └── skills/
-    └── greet/
+    └── summarize/
         ├── models.py
         └── handler.py
 ```
 
-**`skills/greet/models.py`**
+**`skills/summarize/models.py`**
 ```python
 from harnessapi import SkillInput, SkillOutput
 
 class Input(SkillInput):
-    name: str
+    text: str
+    max_length: int = 200
 
 class Output(SkillOutput):
-    message: str
+    summary: str
 ```
 
-**`skills/greet/handler.py`**
+**`skills/summarize/handler.py`**
 ```python
-"""Say hello to someone."""
+"""Summarize text to a target length."""
 from .models import Input, Output
 
 async def handle(input: Input) -> Output:
-    return Output(message=f"Hello, {input.name}!")
+    return Output(summary=input.text[:input.max_length])
 ```
 
 **`main.py`**
@@ -65,32 +69,82 @@ from harnessapi import HarnessAPI
 app = HarnessAPI(skills_dir=Path(__file__).parent / "skills")
 ```
 
-Run it exactly like a FastAPI app:
-
 ```bash
 uvicorn main:app --reload
 ```
 
+That's it. Your skill is live at `POST /skills/summarize` **and** available as an MCP tool at `http://localhost:8000/mcp`.
+
 ---
 
-## Try the factorial example
+## Streaming is the default
 
-The repo ships with a streaming factorial skill that demonstrates SSE + MCP together.
+Return a value → one clean JSON response. Use `yield` → stream chunks to the client as they're produced.
+
+```python
+# Non-streaming
+async def handle(input: Input) -> Output:
+    return Output(result=compute(input))
+
+# Streaming — just yield
+async def handle(input: Input):
+    async for token in llm.stream(input.prompt):
+        yield token
+```
+
+Clients get standard Server-Sent Events:
+
+```
+event: chunk
+data: The answer is
+
+event: chunk
+data: 42.
+
+event: done
+data:
+```
+
+Need plain JSON instead? Add `Accept: application/json` to your request. Same endpoint, no configuration.
+
+---
+
+## Every skill is also an MCP tool
+
+Add `harnessapi` to Claude Desktop in 10 seconds:
+
+```json
+{
+  "mcpServers": {
+    "my-skills": {
+      "url": "http://localhost:8000/mcp"
+    }
+  }
+}
+```
+
+Every skill you define automatically appears as a tool your agent can call. Add a skill folder, restart the server — it's there.
+
+---
+
+## Try it: streaming factorial
+
+Clone the repo and run the built-in example:
 
 ```bash
-# from the repo root
+git clone https://github.com/edwinjosechittilappilly/harnessapi
+cd harnessapi
+uv sync
 uv run uvicorn examples.factorial_app.main:app --reload
 ```
 
-### Call via HTTP — SSE stream (default)
+Watch 5! computed step-by-step over SSE:
 
 ```bash
 curl -X POST http://localhost:8000/skills/factorial \
   -H "Content-Type: application/json" \
   -d '{"n": 5}'
 ```
-
-Response (each multiplication step streamed as it's computed):
 
 ```
 event: chunk
@@ -112,7 +166,7 @@ event: done
 data:
 ```
 
-### Call via HTTP — plain JSON
+Or get it all at once:
 
 ```bash
 curl -X POST http://localhost:8000/skills/factorial \
@@ -125,73 +179,34 @@ curl -X POST http://localhost:8000/skills/factorial \
 {"chunks": ["start: 1", "2: 2", "3: 6", "4: 24", "5: 120"]}
 ```
 
-### Connect an MCP client
-
-The MCP server is automatically available at:
-
-```
-http://localhost:8000/mcp
-```
-
-Add it to **Claude Desktop** (`claude_desktop_config.json`):
-
-```json
-{
-  "mcpServers": {
-    "harnessapi": {
-      "url": "http://localhost:8000/mcp"
-    }
-  }
-}
-```
-
-Or add it to **Cursor** settings under MCP servers.
-
-The `factorial` skill is automatically registered as an MCP tool with parameter `input.n: int`.
-
 ---
 
-## Skill folder structure
+## Skill folder reference
 
 ```
 skills/
 └── my_skill/
-    ├── handler.py        # REQUIRED — async def handle(input: Input) -> Output
-    ├── models.py         # REQUIRED — class Input(SkillInput), class Output(SkillOutput)
-    ├── skill.toml        # optional — metadata
+    ├── handler.py        # required — your logic lives here
+    ├── models.py         # required — Pydantic Input + Output
+    ├── skill.toml        # optional — name, description, tags, timeout
     ├── defaults/
-    │   └── input.json    # optional — default values shown in OpenAPI docs
+    │   └── input.json    # optional — shown as example in /docs
     └── examples/
-        └── 01.json       # optional — {input: {...}, output: {...}} example pairs
+        └── 01.json       # optional — {input, output} pairs for docs
 ```
 
-**`skill.toml`** (all optional):
+**`skill.toml`**
 ```toml
 [skill]
 description  = "What this skill does"
-is_mcp       = true      # expose as MCP tool (default: true)
-tags         = ["math"]
+is_mcp       = true      # default: true — set false to hide from MCP
+tags         = ["nlp"]
 timeout_secs = 30
-```
-
-### Streaming vs non-streaming
-
-Return a value → non-streaming (single `result` SSE event):
-```python
-async def handle(input: Input) -> Output:
-    return Output(...)
-```
-
-Use `yield` → streaming (multiple `chunk` SSE events):
-```python
-async def handle(input: Input):
-    for item in compute_steps(input):
-        yield item
 ```
 
 ---
 
-## Decorator API (no folder needed)
+## Prefer decorators? That works too.
 
 ```python
 from harnessapi import HarnessAPI, SkillInput, SkillOutput, skill
@@ -203,13 +218,9 @@ class TranslateInput(SkillInput):
 class TranslateOutput(SkillOutput):
     translated: str
 
-@skill(
-    name="translate",
-    input_model=TranslateInput,
-    output_model=TranslateOutput,
-    is_mcp=True,
-)
-async def translate_handler(input: TranslateInput) -> TranslateOutput:
+@skill(name="translate", input_model=TranslateInput, output_model=TranslateOutput)
+async def translate(input: TranslateInput) -> TranslateOutput:
+    # call your translation API here
     return TranslateOutput(translated=f"[{input.target_lang}] {input.text}")
 
 app = HarnessAPI(title="My Skills")
@@ -217,38 +228,48 @@ app = HarnessAPI(title="My Skills")
 
 ---
 
-## Runtime edit endpoint (advanced)
+## Hot-swap handlers at runtime
 
-Enable hot-swapping a skill's handler over HTTP:
+Need to tweak a skill without restarting? Enable the edit endpoint and push new code over HTTP:
 
 ```python
 app = HarnessAPI(skills_dir="./skills", enable_edit_endpoints=True)
 ```
 
 ```bash
-curl -X POST http://localhost:8000/skills/factorial/edit \
+curl -X POST http://localhost:8000/skills/summarize/edit \
   -H "Content-Type: application/json" \
-  -d '{
-    "source_code": "async def handle(input):\n    yield f\"custom: {input.n}\"",
-    "persist": false
-  }'
+  -d '{"source_code": "async def handle(input):\n    return Output(summary=input.text.upper())", "persist": true}'
 ```
 
-> **Security note**: The edit endpoint executes arbitrary Python. Always protect it with authentication middleware in production. It is disabled by default.
+> Disabled by default. Protect with auth middleware before exposing in production.
 
 ---
 
-## SSE event protocol
+## What you get out of the box
 
-| Event    | When                                      |
-|----------|-------------------------------------------|
-| `chunk`  | Each yielded value from a streaming handler |
-| `result` | The final output of a non-streaming handler |
-| `done`   | Always the last event                     |
-| `error`  | Handler raised an exception               |
+| Feature | Details |
+|---|---|
+| HTTP endpoint | `POST /skills/{name}` for every skill |
+| Streaming | SSE by default, JSON fallback via `Accept` header |
+| MCP server | `/mcp` — all skills auto-registered as tools |
+| OpenAPI docs | `/docs` — full interactive Swagger UI |
+| Pydantic validation | Input validated before your handler is called |
+| Timeouts | Per-skill `timeout_secs` in `skill.toml` |
+| Hot-swap | Opt-in edit endpoint for runtime handler replacement |
 
 ---
 
-## OpenAPI docs
+## Philosophy
 
-Interactive docs are available at `http://localhost:8000/docs` — all skills appear as documented POST endpoints with their Pydantic schemas.
+Most API frameworks start with routes. Most agent frameworks start with tools. `harnessapi` starts with **skills** — self-contained units of capability that are both, automatically.
+
+Drop a folder. Define input and output. Everything else is handled.
+
+---
+
+<div align="center">
+
+Built on [FastAPI](https://fastapi.tiangolo.com) · [FastMCP](https://github.com/jlowin/fastmcp) · [Pydantic](https://docs.pydantic.dev) · [uv](https://docs.astral.sh/uv/)
+
+</div>
