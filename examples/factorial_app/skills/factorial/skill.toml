@@ -1,0 +1,5 @@
+[skill]
+description = "Compute the factorial of n, streaming each multiplication step"
+is_mcp      = true
+tags        = ["math"]
+timeout_secs = 10
