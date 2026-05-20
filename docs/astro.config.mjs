@@ -7,6 +7,8 @@ export default defineConfig({
   integrations: [
     starlight({
       title: 'harnessapi',
+      defaultLocale: 'root',
+      locales: { root: { label: 'English', lang: 'en' } },
       description:
         'Python framework to build streaming APIs and MCP tools from skill folders. Write a skill. Get an API. Get an MCP tool. Ship.',
       social: [
@@ -26,8 +28,17 @@ export default defineConfig({
           'https://github.com/edwinjosechittilappilly/harnessapi/edit/main/docs/',
       },
       customCss: ['./src/styles/custom.css'],
+      expressiveCode: {
+        themes: ['github-light', 'github-dark'],
+        styleOverrides: {
+          borderRadius: '10px',
+          borderWidth: '1px',
+          codeFontFamily: '"Geist Mono", "SF Mono", ui-monospace, monospace',
+        },
+      },
       components: {
         SiteTitle: './src/components/SiteTitle.astro',
+        ThemeProvider: './src/components/ThemeProvider.astro',
       },
       sidebar: [
         {
