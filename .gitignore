@@ -181,3 +181,4 @@ cython_debug/
 .cursorindexingignore
 /.agents
 skills-lock.json
+/test-run-app
