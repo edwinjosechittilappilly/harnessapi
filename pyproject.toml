@@ -28,12 +28,6 @@ classifiers = [
     "Topic :: Software Development :: Libraries :: Python Modules",
 ]
 
-[project.urls]
-Homepage      = "https://github.com/edwinjosechittilappilly/harnessapi"
-Documentation = "https://github.com/edwinjosechittilappilly/harnessapi#readme"
-Repository    = "https://github.com/edwinjosechittilappilly/harnessapi"
-Issues        = "https://github.com/edwinjosechittilappilly/harnessapi/issues"
-Changelog     = "https://github.com/edwinjosechittilappilly/harnessapi/releases"
 dependencies = [
     "fastapi>=0.115.0",
     "fastmcp>=2.0.0",
@@ -42,6 +36,13 @@ dependencies = [
     "anyio>=4.0.0",
     "sse-starlette>=2.0.0",
 ]
+
+[project.urls]
+Homepage      = "https://github.com/edwinjosechittilappilly/harnessapi"
+Documentation = "https://github.com/edwinjosechittilappilly/harnessapi#readme"
+Repository    = "https://github.com/edwinjosechittilappilly/harnessapi"
+Issues        = "https://github.com/edwinjosechittilappilly/harnessapi/issues"
+Changelog     = "https://github.com/edwinjosechittilappilly/harnessapi/releases"
 
 [project.optional-dependencies]
 dev = [
