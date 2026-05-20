@@ -1,0 +1,34 @@
+# harnessapi
+
+> Python framework that turns a skill folder into a streaming HTTP API and an MCP tool — simultaneously, with no routes, no decorators, and no separate server to maintain.
+
+harnessapi is a Python framework (MIT license, Python 3.11+) built on FastAPI and FastMCP. You write a skill folder with two required files (models.py for Pydantic I/O, handler.py for async logic) and optionally a skill.toml for metadata. harnessapi discovers it at startup and registers it as a POST /skills/{name} HTTP endpoint, an MCP tool at /mcp, and an entry in the Swagger UI at /docs — all three simultaneously.
+
+Streaming is built in: use `return` for a single response, `yield` for Server-Sent Events (SSE). Clients that send `Accept: application/json` receive a collected JSON response from the same handler with no code changes.
+
+- PyPI: https://pypi.org/project/harnessapi/
+- GitHub: https://github.com/edwinjosechittilappilly/harnessapi
+- Docs: https://edwinjosechittilappilly.github.io/harnessapi/
+
+## Docs
+
+- [Introduction](https://edwinjosechittilappilly.github.io/harnessapi/): What harnessapi is, core idea, when to use it.
+- [Quick start](https://edwinjosechittilappilly.github.io/harnessapi/guides/quickstart/): Get a streaming API and MCP tool running in 60 seconds.
+- [Installation](https://edwinjosechittilappilly.github.io/harnessapi/guides/installation/): Install with uv, pip, or try instantly with uvx.
+- [Skill folders](https://edwinjosechittilappilly.github.io/harnessapi/concepts/skill-folders/): Full folder structure — handler.py, models.py, skill.toml, SKILL.md, defaults/, examples/.
+- [Streaming (SSE)](https://edwinjosechittilappilly.github.io/harnessapi/concepts/streaming/): return vs yield, SSE event format, JSON mode via Accept header.
+- [MCP tools](https://edwinjosechittilappilly.github.io/harnessapi/concepts/mcp/): How skills auto-register as MCP tools; connecting to Claude Desktop, Cursor, Copilot.
+- [Example: Factorial (streaming)](https://edwinjosechittilappilly.github.io/harnessapi/examples/factorial/): Streaming factorial step-by-step with SSE and MCP.
+- [Example: Summarizer (LLM)](https://edwinjosechittilappilly.github.io/harnessapi/examples/summarizer/): LLM summarization as a streaming skill and MCP tool.
+- [Example: Web scraper](https://edwinjosechittilappilly.github.io/harnessapi/examples/web-scraper/): Streaming web scraping with harnessapi.
+- [Example: Image captioner](https://edwinjosechittilappilly.github.io/harnessapi/examples/image-captioner/): Vision LLM skill streaming image captions.
+- [Convert an agentskills.io skill](https://edwinjosechittilappilly.github.io/harnessapi/guides/convert-skill/): Drop-in compatibility with existing agentskills.io skill folders.
+- [Connect to Claude Desktop](https://edwinjosechittilappilly.github.io/harnessapi/guides/claude-desktop/): Add harnessapi as an MCP server in Claude Desktop and Cursor.
+- [Deploy to production](https://edwinjosechittilappilly.github.io/harnessapi/guides/deploy/): Deploy to Railway, Fly.io, Docker, or any ASGI host.
+- [CLI: harnessapi init](https://edwinjosechittilappilly.github.io/harnessapi/reference/init/): Scaffold new projects, convert skill folders, wrap Python functions.
+- [CLI: harnessapi run](https://edwinjosechittilappilly.github.io/harnessapi/reference/run/): Start the development server with auto-reload.
+
+## Optional: full content
+
+For a single-file dump of all documentation prose, see:
+https://edwinjosechittilappilly.github.io/harnessapi/llms-full.txt

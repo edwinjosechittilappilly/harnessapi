@@ -1,0 +1,436 @@
+# harnessapi — Full Documentation
+
+> Python framework that turns a skill folder into a streaming HTTP API and an MCP tool — simultaneously, with no routes, no decorators, and no separate server to maintain.
+
+- PyPI: https://pypi.org/project/harnessapi/
+- GitHub: https://github.com/edwinjosechittilappilly/harnessapi
+- Docs: https://edwinjosechittilappilly.github.io/harnessapi/
+- License: MIT
+- Requires: Python 3.11+
+
+---
+
+## Introduction
+
+harnessapi turns a skill folder into a streaming HTTP API and an MCP tool — simultaneously, with no routes, no decorators, and no separate server to maintain.
+
+    uvx harnessapi init my-project
+    cd my-project
+    uvx harnessapi run
+
+    curl -X POST http://localhost:8000/skills/greet \
+      -H "Content-Type: application/json" \
+      -H "Accept: application/json" \
+      -d '{"name": "world"}'
+    # → {"message": "Hello, world! Welcome to harnessapi.", "length": 36}
+
+Your skill is live at three places simultaneously: POST /skills/greet (HTTP endpoint), /mcp (MCP tool), and /docs (Swagger UI).
+
+### When to use harnessapi
+
+- Exposing Python functions as streaming API endpoints (Server-Sent Events)
+- Building tools for Claude Desktop, Cursor, or any MCP client
+- Converting an agentskills.io skill folder into a production API
+- Shipping an LLM-powered microservice without FastAPI boilerplate
+
+### Core idea
+
+Write a skill folder with two required files:
+
+    skills/greet/
+    ├── models.py    ← Pydantic Input + Output
+    └── handler.py   ← async handle() function
+
+harnessapi discovers it at startup and registers it as both an HTTP endpoint and an MCP tool. Add more folders — get more endpoints and tools.
+
+---
+
+## Quick Start
+
+Get a skill live as a streaming HTTP API and MCP tool in under 60 seconds.
+
+### Option A — Try instantly with uvx
+
+No install needed. uvx runs harnessapi in an isolated environment:
+
+    uvx harnessapi init my-project
+    cd my-project
+    uvx harnessapi run
+
+    curl -X POST http://localhost:8000/skills/greet \
+      -H "Content-Type: application/json" \
+      -H "Accept: application/json" \
+      -d '{"name": "world"}'
+    # → {"message": "Hello, world! Welcome to harnessapi.", "length": 36}
+
+Your skill is also available as an MCP tool at http://localhost:8000/mcp and has full Swagger docs at http://localhost:8000/docs.
+
+### Option B — Add to an existing project
+
+    uv add harnessapi
+    # or: pip install harnessapi
+
+Create skill files:
+
+    # skills/greet/models.py
+    from harnessapi import SkillInput, SkillOutput
+
+    class Input(SkillInput):
+        name: str
+
+    class Output(SkillOutput):
+        message: str
+        length: int
+
+    # skills/greet/handler.py
+    from .models import Input, Output
+
+    async def handle(input: Input) -> Output:
+        message = f"Hello, {input.name}! Welcome to harnessapi."
+        return Output(message=message, length=len(message))
+
+    # skills/greet/skill.toml
+    [skill]
+    description  = "Greet someone by name"
+    is_mcp       = true
+    tags         = ["demo"]
+    timeout_secs = 30
+
+    # main.py
+    from pathlib import Path
+    from harnessapi import HarnessAPI
+
+    app = HarnessAPI(skills_dir=Path(__file__).parent / "skills")
+
+    harnessapi run
+
+### What's running
+
+| URL | What |
+|-----|------|
+| POST http://localhost:8000/skills/greet | HTTP endpoint (SSE stream) |
+| GET http://localhost:8000/docs | Swagger UI |
+| http://localhost:8000/mcp | MCP server |
+
+---
+
+## Installation
+
+Requirements: Python 3.11 or higher, uv (recommended) or pip.
+
+    uv add harnessapi
+    # or: pip install harnessapi
+    # or without installing: uvx harnessapi init my-project
+
+Dependencies installed automatically: fastapi, fastmcp, pydantic, uvicorn, sse-starlette, anyio.
+
+---
+
+## Skill Folders
+
+A skill folder is the core building block of harnessapi. Each folder becomes one HTTP endpoint and one MCP tool automatically.
+
+### Minimum structure
+
+    skills/
+    └── my-skill/
+        ├── handler.py    ← required
+        └── models.py     ← required
+
+### Full structure
+
+    skills/
+    └── my-skill/
+        ├── handler.py        ← required: your logic
+        ├── models.py         ← required: Pydantic Input + Output
+        ├── SKILL.md          ← optional: agentskills.io metadata
+        ├── skill.toml        ← optional: name, description, tags, timeout
+        ├── defaults/
+        │   └── input.json    ← optional: shown as defaults in /docs
+        ├── examples/
+        │   └── 01.json       ← optional: {input, output} pairs for docs
+        └── edit/
+            └── handler.py    ← optional: hot-swap handler
+
+### models.py
+
+    from harnessapi import SkillInput, SkillOutput
+
+    class Input(SkillInput):
+        text: str
+        max_length: int = 200   # optional field with default
+
+    class Output(SkillOutput):
+        summary: str
+        word_count: int
+
+SkillInput extends BaseModel with extra="forbid" — extra fields are rejected with a 422 before your handler is called.
+
+### handler.py
+
+    from .models import Input, Output
+
+    # Non-streaming
+    async def handle(input: Input) -> Output:
+        return Output(summary=input.text[:input.max_length], word_count=len(input.text.split()))
+
+    # Streaming
+    async def handle(input: Input):
+        for word in input.text.split():
+            yield word
+
+Relative imports (from .models import ...) work out of the box.
+
+### skill.toml
+
+    [skill]
+    description  = "Summarize text to a target length"
+    is_mcp       = true      # set false to hide from MCP clients
+    tags         = ["text", "nlp"]
+    timeout_secs = 30        # default: 30
+
+If skill.toml is absent, harnessapi uses the folder name as the skill name and the handler docstring as the description.
+
+### SKILL.md
+
+Optional agentskills.io compatible metadata file. harnessapi reads the YAML frontmatter and Markdown body. skill.toml values take priority over SKILL.md frontmatter.
+
+### Discovery
+
+harnessapi scans the skills_dir at startup. Any subfolder containing handler.py and models.py is loaded as a skill.
+
+---
+
+## Streaming (SSE)
+
+harnessapi endpoints stream by default using Server-Sent Events (SSE). The handler type determines the protocol automatically.
+
+### Non-streaming — return a value
+
+    async def handle(input: Input) -> Output:
+        return Output(result=compute(input.text))
+
+Client receives:
+
+    event: result
+    data: {"result": "..."}
+
+    event: done
+    data:
+
+### Streaming — yield chunks
+
+    async def handle(input: Input):
+        async for token in llm.stream(input.prompt):
+            yield token
+
+Client receives:
+
+    event: chunk
+    data: The answer
+
+    event: chunk
+    data:  is 42.
+
+    event: done
+    data:
+
+### SSE event protocol
+
+| Event | When emitted |
+|-------|-------------|
+| chunk | Each value yielded by a streaming handler |
+| result | Full JSON output from a non-streaming handler |
+| done | Always the last event |
+| error | Handler raised an exception or timed out |
+
+### Switch to plain JSON
+
+Add Accept: application/json to get a regular HTTP response instead of SSE. harnessapi collects all chunks and returns them together — no code changes needed.
+
+For streaming handlers, JSON mode returns {"chunks": ["chunk1", "chunk2", ...]}.
+For non-streaming handlers, JSON mode returns the Output model fields directly.
+
+### Timeouts
+
+Set per-skill in skill.toml: timeout_secs = 60 (default: 30).
+
+---
+
+## MCP Tools
+
+Every skill is automatically registered as a Model Context Protocol (MCP) tool — no extra code, no schema files, no separate server.
+
+When HarnessAPI starts, it:
+1. Discovers skill folders in skills_dir
+2. Registers each skill as an HTTP endpoint at POST /skills/{name}
+3. Registers each skill as an MCP tool at /mcp
+
+The MCP tool schema is derived from the skill's Pydantic Input model. No manual schema definition.
+
+### Connect Claude Desktop
+
+Add to ~/Library/Application Support/Claude/claude_desktop_config.json:
+
+    {
+      "mcpServers": {
+        "my-skills": {
+          "url": "http://localhost:8000/mcp"
+        }
+      }
+    }
+
+Restart Claude Desktop. Your skills appear as tools Claude can call.
+
+### Connect Cursor
+
+Open Cursor Settings → MCP → Add Server, add the same JSON config.
+
+### Disable MCP for a specific skill
+
+Set is_mcp = false in skill.toml.
+
+### Streaming and MCP
+
+MCP tools are request-response. Streaming handlers are fully supported — harnessapi collects all yielded chunks and joins them as a single string for MCP clients.
+
+### MCP endpoint
+
+The MCP server runs at /mcp as a FastMCP HTTP ASGI app.
+
+---
+
+## Example: Factorial (Streaming)
+
+Computes n! step-by-step, streaming each multiplication as an SSE event.
+
+    # skills/factorial/models.py
+    from harnessapi import SkillInput, SkillOutput
+
+    class Input(SkillInput):
+        n: int
+
+    class Output(SkillOutput):
+        result: int
+        steps: list[str]
+
+    # skills/factorial/handler.py
+    from .models import Input
+
+    async def handle(input: Input):
+        if input.n < 0:
+            raise ValueError("n must be a non-negative integer")
+        acc = 1
+        if input.n == 0:
+            yield "0! = 1"
+            return
+        yield "start: 1"
+        for i in range(2, input.n + 1):
+            acc *= i
+            yield f"{i}: {acc}"
+
+    curl -X POST http://localhost:8000/skills/factorial \
+      -H "Content-Type: application/json" \
+      -d '{"n": 5}'
+    # → event: chunk / data: start: 1 / ... / event: chunk / data: 5: 120 / event: done
+
+    # JSON mode
+    curl ... -H "Accept: application/json" -d '{"n": 5}'
+    # → {"chunks": ["start: 1", "2: 2", "3: 6", "4: 24", "5: 120"]}
+
+---
+
+## CLI Reference
+
+### harnessapi init
+
+Scaffolds a new harnessapi project or adds the harnessapi layer to existing skill folders.
+
+    harnessapi init my-project                          # new project with greet skill
+    harnessapi init --skill .agents/skills/summarize    # add API layer to existing skill
+    harnessapi init --skills-dir .agents/skills         # convert whole directory
+    harnessapi init --function utils/compute.py --output skills  # wrap a Python function
+
+### harnessapi run
+
+Starts the harnessapi development server using uvicorn with auto-reload.
+
+    harnessapi run                    # auto-detects main:app, port 8000
+    harnessapi run --port 8080        # custom port
+    harnessapi run --host 0.0.0.0     # expose to network
+    harnessapi run --no-reload        # disable auto-reload
+    harnessapi run --app mymodule:app # explicit app
+
+URLs when running:
+- POST http://localhost:8000/skills/{name} — skill endpoints
+- GET  http://localhost:8000/docs          — Swagger UI
+- GET  http://localhost:8000/redoc         — ReDoc
+-      http://localhost:8000/mcp           — MCP server
+- GET  http://localhost:8000/openapi.json  — OpenAPI schema
+
+---
+
+## Convert an agentskills.io Skill
+
+harnessapi is a superset of the agentskills.io standard. Any folder with a SKILL.md is a valid agentskills.io skill. Adding handler.py and models.py makes it a full harnessapi skill.
+
+    harnessapi init --skill .agents/skills/summarize
+    # or for a whole directory:
+    harnessapi init --skills-dir .agents/skills
+
+Existing files are never overwritten. SKILL.md is never modified. All agentskills.io tooling continues to work.
+
+Metadata priority: skill.toml > SKILL.md frontmatter > folder name / docstring.
+
+---
+
+## Deploy to Production
+
+harnessapi is a standard ASGI app (FastAPI subclass) — deploys anywhere that runs Python ASGI apps.
+
+### Railway (recommended)
+
+Set start command: uvicorn main:app --host 0.0.0.0 --port $PORT
+
+### Fly.io
+
+    fly launch && fly secrets set OPENAI_API_KEY=sk-... && fly deploy
+
+### Docker
+
+    FROM python:3.11-slim
+    WORKDIR /app
+    COPY . .
+    RUN pip install uv && uv sync --no-dev
+    EXPOSE 8000
+    CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
+
+### Production config
+
+    app = HarnessAPI(
+        skills_dir="./skills",
+        enable_edit_endpoints=os.getenv("ENABLE_EDIT") == "true",  # disabled by default
+    )
+
+---
+
+## Connect to Claude Desktop
+
+Every harnessapi skill is automatically registered as an MCP tool. Connecting takes under a minute.
+
+1. Start server: harnessapi run
+2. Edit ~/Library/Application Support/Claude/claude_desktop_config.json:
+   {"mcpServers": {"my-skills": {"url": "http://localhost:8000/mcp"}}}
+3. Restart Claude Desktop — your skills appear in the tools panel.
+
+Write skill descriptions as instructions to the LLM — it directly controls when the model chooses to call your tool.
+
+---
+
+## See Also
+
+- FastMCP: https://github.com/jlowin/fastmcp — MCP server framework harnessapi builds on
+- FastAPI: https://fastapi.tiangolo.com — the HTTP layer underneath
+- agentskills.io: https://agentskills.io — skill folder standard harnessapi is compatible with
+- Model Context Protocol: https://modelcontextprotocol.io — the open protocol for agent tools
+- Pydantic: https://docs.pydantic.dev — data validation for skill inputs and outputs

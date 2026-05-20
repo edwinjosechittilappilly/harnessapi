@@ -90,7 +90,28 @@ export default defineConfig({
           attrs: {
             name: 'keywords',
             content:
-              'harnessapi, MCP, Model Context Protocol, FastAPI, streaming API, SSE, Python, LLM tools, agent framework, skill framework, Claude, Cursor',
+              'harnessapi, MCP, Model Context Protocol, FastAPI, streaming API, SSE, Python, LLM tools, agent framework, skill framework, Claude, Cursor, FastMCP, agentskills',
+          },
+        },
+        {
+          tag: 'meta',
+          attrs: { property: 'og:image', content: 'https://raw.githubusercontent.com/edwinjosechittilappilly/harnessapi/main/assets/banner.png' },
+        },
+        {
+          tag: 'meta',
+          attrs: { name: 'twitter:card', content: 'summary_large_image' },
+        },
+        {
+          tag: 'meta',
+          attrs: { name: 'twitter:image', content: 'https://raw.githubusercontent.com/edwinjosechittilappilly/harnessapi/main/assets/banner.png' },
+        },
+        {
+          tag: 'link',
+          attrs: {
+            rel: 'alternate',
+            type: 'text/plain',
+            title: 'harnessapi — LLM-friendly docs index',
+            href: 'https://edwinjosechittilappilly.github.io/harnessapi/llms.txt',
           },
         },
         { tag: 'link', attrs: { rel: 'preconnect', href: 'https://fonts.googleapis.com' } },

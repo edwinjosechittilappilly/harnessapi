@@ -1,11 +1,11 @@
 ---
-title: Example Reference
-description: A reference page in my new Starlight docs site.
+title: CLI reference overview
+description: Reference documentation for all harnessapi CLI commands — init and run.
 ---
 
-Reference pages are ideal for outlining how things work in terse and clear terms.
-Less concerned with telling a story or addressing a specific use case, they should give a comprehensive outline of what you're documenting.
+Reference documentation for the harnessapi CLI.
 
-## Further reading
-
-- Read [about reference](https://diataxis.fr/reference/) in the Diátaxis framework
+| Command | What it does |
+|---------|-------------|
+| [harnessapi init](/reference/init/) | Scaffold a new project, convert a skill folder, or wrap a Python function |
+| [harnessapi run](/reference/run/) | Start the development server with auto-reload |

@@ -1,0 +1,8 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://edwinjosechittilappilly.github.io/harnessapi/sitemap-index.xml
+
+# LLM-friendly content index
+# https://edwinjosechittilappilly.github.io/harnessapi/llms.txt
+# https://edwinjosechittilappilly.github.io/harnessapi/llms-full.txt

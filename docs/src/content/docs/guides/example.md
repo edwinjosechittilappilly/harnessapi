@@ -1,11 +1,14 @@
 ---
-title: Example Guide
-description: A guide in my new Starlight docs site.
+title: Guides overview
+description: Practical how-to guides for harnessapi — quickstart, installation, Claude Desktop, agentskills.io migration, and production deployment.
 ---
 
-Guides lead a user through a specific task they want to accomplish, often with a sequence of steps.
-Writing a good guide requires thinking about what your users are trying to do.
+Practical step-by-step guides for common harnessapi tasks.
 
-## Further reading
-
-- Read [about how-to guides](https://diataxis.fr/how-to-guides/) in the Diátaxis framework
+| Guide | What it covers |
+|-------|---------------|
+| [Quick start](/guides/quickstart/) | Running project in 60 seconds with uvx or uv |
+| [Installation](/guides/installation/) | Install with uv, pip, or try instantly with uvx |
+| [Convert an agentskills.io skill](/guides/convert-skill/) | Add harnessapi to an existing skill folder |
+| [Connect to Claude Desktop](/guides/claude-desktop/) | Wire skills as MCP tools in Claude Desktop and Cursor |
+| [Deploy to production](/guides/deploy/) | Railway, Fly.io, Docker, Gunicorn deployment options |
