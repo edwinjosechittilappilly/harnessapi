@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="640" height="160" viewBox="0 0 640 160">
+  <rect width="640" height="160" rx="16" fill="#0a0a0d"/>
+  <!-- H-mark icon -->
+  <defs>
+    <linearGradient id="hg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#7c3aed"/>
+      <stop offset="100%" stop-color="#38bdf8"/>
+    </linearGradient>
+  </defs>
+  <g transform="translate(60, 44) scale(2.57)">
+    <rect x="3" y="5" width="4.5" height="19" rx="1.5" fill="#e8e8ea"/>
+    <rect x="15" y="1" width="4.5" height="23" rx="1.5" fill="url(#hg)"/>
+    <rect x="3" y="12" width="16.5" height="4" rx="1.2" fill="#e8e8ea"/>
+    <circle cx="23" cy="4" r="2" fill="#7dd3fc"/>
+  </g>
+  <!-- Wordmark: harness -->
+  <text x="158" y="98" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" font-size="54" font-weight="300" font-style="italic" letter-spacing="-1" fill="#e8e8ea">harness</text>
+  <!-- Wordmark: api (gradient) -->
+  <defs>
+    <linearGradient id="tg" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#a78bfa"/>
+      <stop offset="100%" stop-color="#7dd3fc"/>
+    </linearGradient>
+  </defs>
+  <text x="472" y="98" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" font-size="54" font-weight="300" font-style="italic" letter-spacing="-1" fill="url(#tg)">api</text>
+</svg>

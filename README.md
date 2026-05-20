@@ -1,6 +1,6 @@
 <div align="center">
 
-![harnessapi — Python Skill Framework for MCP Tools and Streaming APIs](https://imagetourl.cloud/baqmxjb7.png)
+<img src="https://raw.githubusercontent.com/edwinjosechittilappilly/harnessapi/main/assets/banner.svg" alt="harnessapi" width="480" />
 
 ### Python Skill Framework for MCP Tools and Streaming APIs
 
