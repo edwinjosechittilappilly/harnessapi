@@ -25,8 +25,10 @@ skills/
     ├── skill.toml        ← optional: name, description, tags, timeout
     ├── defaults/
     │   └── input.json    ← optional: shown as defaults in /docs
-    └── examples/
-        └── 01.json       ← optional: {input, output} pairs for docs
+    ├── examples/
+    │   └── 01.json       ← optional: {input, output} pairs for docs
+    └── edit/
+        └── handler.py    ← optional: hot-swap handler (loaded at runtime)
 ```
 
 ## models.py

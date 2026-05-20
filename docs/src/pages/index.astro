@@ -59,6 +59,7 @@ const b = import.meta.env.BASE_URL.replace(/\/$/, '');
     </a>
     <nav class="nav-links">
       <a href="#drop">Drop</a>
+      <a href="#api">API</a>
       <a href="#mcp">MCP</a>
       <a href="#quickstart">Start</a>
       <a href={`${b}/guides/quickstart/`}>Docs</a>
@@ -131,8 +132,8 @@ const b = import.meta.env.BASE_URL.replace(/\/$/, '');
         </div>
         <div class="flow-block">
           <div class="fh">Live surfaces</div>
-          <div class="endpoint-row"><span class="dot"></span><span class="method">POST</span><span class="fpath">/skills/*</span></div>
-          <div class="endpoint-row"><span class="dot"></span><span class="method">GET</span><span class="fpath">/mcp</span></div>
+          <div class="endpoint-row"><span class="dot"></span><span class="method">POST</span><span class="fpath">/skills/&#123;name&#125;</span></div>
+          <div class="endpoint-row"><span class="dot"></span><span class="method"></span><span class="fpath">/mcp</span></div>
           <div class="endpoint-row"><span class="dot"></span><span class="method">GET</span><span class="fpath">/docs</span></div>
         </div>
       </div>

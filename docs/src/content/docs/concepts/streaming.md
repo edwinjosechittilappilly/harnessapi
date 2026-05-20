@@ -71,7 +71,13 @@ curl -X POST http://localhost:8000/skills/summarize \
   -d '{"text": "hello world"}'
 ```
 
-For streaming handlers, JSON mode returns `{"chunks": ["chunk1", "chunk2", ...]}`.
+For **streaming** handlers, JSON mode returns `{"chunks": ["chunk1", "chunk2", ...]}`.
+
+For **non-streaming** handlers, JSON mode returns the Output model fields directly:
+
+```json
+{"message": "Hello, world! Welcome to harnessapi.", "length": 36}
+```
 
 ## Calling from Python
 
