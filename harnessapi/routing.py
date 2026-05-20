@@ -5,6 +5,7 @@ from typing import TYPE_CHECKING
 from fastapi import Request
 from fastapi.responses import JSONResponse
 from fastapi.routing import APIRoute
+from pydantic import ValidationError
 
 from .edit import EditRequest, EditResponse, apply_edit
 from .streaming import make_sse_response
@@ -34,7 +35,10 @@ class SkillRoute(APIRoute):
 
         async def endpoint(request: Request):
             body = await request.json()
-            input_obj = skill.input_model.model_validate(body)
+            try:
+                input_obj = skill.input_model.model_validate(body)
+            except ValidationError as exc:
+                return JSONResponse(status_code=422, content={"detail": exc.errors()})
             accept = request.headers.get("accept", "")
             if "application/json" in accept:
                 if skill.is_streaming_handler():
