@@ -1,0 +1,77 @@
+:root {
+  --sl-color-accent-low: #1a1040;
+  --sl-color-accent: #7c3aed;
+  --sl-color-accent-high: #c4b5fd;
+  --sl-color-white: #ffffff;
+  --sl-color-gray-1: #eeedf0;
+  --sl-color-gray-2: #c2c0c7;
+  --sl-color-gray-3: #8b8896;
+  --sl-color-gray-4: #585670;
+  --sl-color-gray-5: #383650;
+  --sl-color-gray-6: #24203a;
+  --sl-color-black: #13111e;
+}
+
+/* Hero tagline punch */
+.hero-tagline {
+  font-size: 1.25rem;
+  color: var(--sl-color-gray-2);
+}
+
+/* Gradient title */
+.sl-markdown-content h1:first-child {
+  background: linear-gradient(135deg, #7c3aed 0%, #06b6d4 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* Code block accent border */
+.expressive-code .frame {
+  border-left: 3px solid var(--sl-color-accent);
+}
+
+/* Badge styling */
+.badge-row {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  margin: 1rem 0;
+}
+
+/* Feature cards */
+.feature-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 1.25rem;
+  margin: 1.5rem 0;
+}
+
+.feature-card {
+  border: 1px solid var(--sl-color-gray-5);
+  border-radius: 0.75rem;
+  padding: 1.25rem;
+  background: var(--sl-color-gray-6);
+  transition: border-color 0.2s;
+}
+
+.feature-card:hover {
+  border-color: var(--sl-color-accent);
+}
+
+.feature-card .icon {
+  font-size: 1.75rem;
+  margin-bottom: 0.5rem;
+}
+
+.feature-card h3 {
+  margin: 0 0 0.4rem;
+  font-size: 1rem;
+  color: var(--sl-color-white);
+}
+
+.feature-card p {
+  margin: 0;
+  font-size: 0.875rem;
+  color: var(--sl-color-gray-2);
+}

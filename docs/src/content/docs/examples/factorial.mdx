@@ -1,0 +1,127 @@
+---
+title: "Factorial — streaming skill"
+description: A real harnessapi example — computing factorial step-by-step with SSE streaming and MCP tool exposure.
+---
+
+import { Steps } from '@astrojs/starlight/components';
+
+This example ships with the harnessapi repo. It computes `n!` step-by-step, streaming each multiplication as an SSE event — and exposes the same logic as an MCP tool.
+
+**What it demonstrates:**
+- Async generator handler (`yield` for streaming)
+- Integer input validation via Pydantic
+- Calling via curl (SSE and JSON modes)
+- MCP tool usage from Claude Desktop
+
+---
+
+## Skill files
+
+```python title="skills/factorial/models.py"
+from harnessapi import SkillInput, SkillOutput
+
+class Input(SkillInput):
+    n: int
+
+class Output(SkillOutput):
+    result: int
+    steps: list[str]
+```
+
+```python title="skills/factorial/handler.py"
+"""Compute factorial of n, streaming each multiplication step."""
+from .models import Input
+
+async def handle(input: Input):
+    if input.n < 0:
+        raise ValueError("n must be a non-negative integer")
+    acc = 1
+    if input.n == 0:
+        yield "0! = 1"
+        return
+    yield "start: 1"
+    for i in range(2, input.n + 1):
+        acc *= i
+        yield f"{i}: {acc}"
+```
+
+```toml title="skills/factorial/skill.toml"
+[skill]
+description  = "Compute the factorial of n, streaming each step"
+is_mcp       = true
+tags         = ["math", "demo"]
+timeout_secs = 10
+```
+
+```python title="main.py"
+from pathlib import Path
+from harnessapi import HarnessAPI
+
+app = HarnessAPI(
+    skills_dir=Path(__file__).parent / "skills",
+    title="Factorial Harness",
+    description="Demo: factorial as a streaming skill + MCP tool",
+)
+```
+
+---
+
+## Run it
+
+<Steps>
+
+1. **Clone and run**
+
+   ```bash
+   git clone https://github.com/edwinjosechittilappilly/harnessapi
+   cd harnessapi
+   uv sync
+   uv run uvicorn examples.factorial_app.main:app --reload
+   ```
+
+2. **Call via SSE (streaming)**
+
+   ```bash
+   curl -X POST http://localhost:8000/skills/factorial \
+     -H "Content-Type: application/json" \
+     -d '{"n": 5}'
+   ```
+
+   ```
+   event: chunk
+   data: start: 1
+
+   event: chunk
+   data: 2: 2
+
+   event: chunk
+   data: 3: 6
+
+   event: chunk
+   data: 4: 24
+
+   event: chunk
+   data: 5: 120
+
+   event: done
+   data:
+   ```
+
+3. **Call via JSON**
+
+   ```bash
+   curl -X POST http://localhost:8000/skills/factorial \
+     -H "Content-Type: application/json" \
+     -H "Accept: application/json" \
+     -d '{"n": 5}'
+   ```
+
+   ```json
+   {"chunks": ["start: 1", "2: 2", "3: 6", "4: 24", "5: 120"]}
+   ```
+
+4. **Open Swagger UI**
+
+   Visit `http://localhost:8000/docs` — try it interactively.
+
+</Steps>

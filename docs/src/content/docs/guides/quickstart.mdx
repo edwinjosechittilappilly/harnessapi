@@ -1,0 +1,141 @@
+---
+title: Quick start
+description: Get a streaming HTTP API and MCP tool running in 60 seconds with harnessapi.
+---
+
+import { Steps, Code, Tabs, TabItem } from '@astrojs/starlight/components';
+
+Get a skill live as a streaming HTTP API and MCP tool in under 60 seconds.
+
+## Option A — Try it instantly with `uvx`
+
+No install needed. `uvx` runs harnessapi in an isolated environment:
+
+<Steps>
+
+1. **Scaffold a new project**
+
+   ```bash
+   uvx harnessapi init my-project
+   cd my-project
+   ```
+
+2. **Start the server**
+
+   ```bash
+   uvx harnessapi run
+   ```
+
+3. **Call your skill**
+
+   ```bash
+   curl -X POST http://localhost:8000/skills/greet \
+     -H "Content-Type: application/json" \
+     -H "Accept: application/json" \
+     -d '{"name": "world"}'
+   ```
+
+   ```json
+   {"message": "Hello, world! Welcome to harnessapi.", "length": 36}
+   ```
+
+</Steps>
+
+Your skill is also available as an MCP tool at `http://localhost:8000/mcp` and has full Swagger docs at `http://localhost:8000/docs`.
+
+---
+
+## Option B — Add to an existing project
+
+<Steps>
+
+1. **Install**
+
+   <Tabs>
+     <TabItem label="uv">
+       ```bash
+       uv add harnessapi
+       ```
+     </TabItem>
+     <TabItem label="pip">
+       ```bash
+       pip install harnessapi
+       ```
+     </TabItem>
+   </Tabs>
+
+2. **Create a skill folder**
+
+   ```
+   skills/
+   └── greet/
+       ├── models.py
+       ├── handler.py
+       └── skill.toml
+   ```
+
+3. **Define your models**
+
+   ```python title="skills/greet/models.py"
+   from harnessapi import SkillInput, SkillOutput
+
+   class Input(SkillInput):
+       name: str
+
+   class Output(SkillOutput):
+       message: str
+       length: int
+   ```
+
+4. **Write your handler**
+
+   ```python title="skills/greet/handler.py"
+   from .models import Input, Output
+
+   async def handle(input: Input) -> Output:
+       message = f"Hello, {input.name}! Welcome to harnessapi."
+       return Output(message=message, length=len(message))
+   ```
+
+5. **Configure the skill**
+
+   ```toml title="skills/greet/skill.toml"
+   [skill]
+   description  = "Greet someone by name"
+   is_mcp       = true
+   tags         = ["demo"]
+   timeout_secs = 30
+   ```
+
+6. **Create the app**
+
+   ```python title="main.py"
+   from pathlib import Path
+   from harnessapi import HarnessAPI
+
+   app = HarnessAPI(skills_dir=Path(__file__).parent / "skills")
+   ```
+
+7. **Run**
+
+   ```bash
+   harnessapi run
+   ```
+
+</Steps>
+
+---
+
+## What's running
+
+| URL | What |
+|-----|------|
+| `POST http://localhost:8000/skills/greet` | HTTP endpoint (SSE stream) |
+| `GET http://localhost:8000/docs` | Swagger UI |
+| `http://localhost:8000/mcp` | MCP server |
+
+## Next steps
+
+- Learn about [streaming with `yield`](/concepts/streaming/)
+- Connect to [Claude Desktop](/guides/claude-desktop/)
+- See real [examples](/examples/factorial/)

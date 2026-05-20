@@ -1,0 +1,136 @@
+---
+title: "Summarizer — LLM skill"
+description: Convert an LLM summarization function into a streaming harnessapi skill and MCP tool.
+---
+
+import { Steps, Aside } from '@astrojs/starlight/components';
+
+This example shows how to wrap an LLM call (using the OpenAI SDK) as a streaming harnessapi skill. The same handler becomes an HTTP SSE endpoint **and** an MCP tool that Claude can call directly.
+
+**What it demonstrates:**
+- Streaming LLM output token-by-token with `yield`
+- API key via environment variable
+- Converting an existing agentskills.io skill with `harnessapi init --skill`
+
+---
+
+## Skill files
+
+```python title="skills/summarize/models.py"
+from harnessapi import SkillInput, SkillOutput
+
+class Input(SkillInput):
+    text: str
+    max_words: int = 100
+    style: str = "concise"   # concise | bullet | formal
+
+class Output(SkillOutput):
+    summary: str
+```
+
+```python title="skills/summarize/handler.py"
+"""Summarize text using an LLM, streaming tokens as they arrive."""
+import os
+from openai import AsyncOpenAI
+from .models import Input
+
+client = AsyncOpenAI(api_key=os.environ["OPENAI_API_KEY"])
+
+async def handle(input: Input):
+    prompt = (
+        f"Summarize the following text in {input.max_words} words or fewer. "
+        f"Style: {input.style}.\n\n{input.text}"
+    )
+    stream = await client.chat.completions.create(
+        model="gpt-4o-mini",
+        messages=[{"role": "user", "content": prompt}],
+        stream=True,
+    )
+    async for chunk in stream:
+        token = chunk.choices[0].delta.content
+        if token:
+            yield token
+```
+
+```toml title="skills/summarize/skill.toml"
+[skill]
+description  = "Summarize text using an LLM. Use when asked to shorten, condense, or summarize."
+is_mcp       = true
+tags         = ["llm", "text", "nlp"]
+timeout_secs = 60
+```
+
+---
+
+## Run it
+
+<Steps>
+
+1. **Set your API key**
+
+   ```bash
+   export OPENAI_API_KEY=sk-...
+   ```
+
+2. **Install**
+
+   ```bash
+   uv add harnessapi openai
+   ```
+
+3. **Create `main.py`**
+
+   ```python title="main.py"
+   from pathlib import Path
+   from harnessapi import HarnessAPI
+
+   app = HarnessAPI(skills_dir=Path(__file__).parent / "skills")
+   ```
+
+4. **Run**
+
+   ```bash
+   harnessapi run
+   ```
+
+5. **Stream a summary**
+
+   ```bash
+   curl -X POST http://localhost:8000/skills/summarize \
+     -H "Content-Type: application/json" \
+     -d '{
+       "text": "Large language models are neural networks trained on vast text...",
+       "max_words": 20,
+       "style": "concise"
+     }'
+   ```
+
+   ```
+   event: chunk
+   data: Large language models are
+
+   event: chunk
+   data:  neural networks trained
+
+   event: chunk
+   data:  on massive text datasets.
+
+   event: done
+   data:
+   ```
+
+</Steps>
+
+## Convert an existing agentskills.io skill
+
+If you already have a `summarize/` folder with a `SKILL.md`, harnessapi can add the handler and models automatically:
+
+```bash
+harnessapi init --skill ./skills/summarize
+```
+
+This generates `handler.py`, `models.py`, and `skill.toml` stubs without touching your `SKILL.md`.
+
+<Aside type="tip">
+  Connect this to Claude Desktop via MCP and Claude can summarize any text you paste — streaming the tokens in real time.
+</Aside>

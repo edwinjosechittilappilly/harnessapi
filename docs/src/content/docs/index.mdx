@@ -1,0 +1,83 @@
+---
+title: harnessapi
+description: Python framework to build streaming APIs and MCP tools from skill folders. Write a skill. Get an API. Get an MCP tool. Ship.
+template: splash
+hero:
+  tagline: Write a skill. Get an API. Get an MCP tool. Ship.
+  image:
+    alt: harnessapi
+    file: ../../assets/houston.webp
+  actions:
+    - text: Quick start
+      link: /guides/quickstart/
+      icon: right-arrow
+      variant: primary
+    - text: View on GitHub
+      link: https://github.com/edwinjosechittilappilly/harnessapi
+      icon: external
+      variant: minimal
+---
+
+import { Card, CardGrid, LinkCard, Badge } from '@astrojs/starlight/components';
+
+<div style="text-align:center; margin: 0.5rem 0 2rem;">
+  <Badge text="v0.1.4" variant="tip" />
+  <Badge text="Python 3.11+" variant="note" />
+  <Badge text="MIT License" variant="success" />
+</div>
+
+**harnessapi** is a Python framework that turns a skill folder into a **streaming HTTP API** and a **Model Context Protocol (MCP) tool** — simultaneously, automatically, with zero boilerplate.
+
+```bash
+# Try it instantly — no install needed
+uvx harnessapi init my-project
+cd my-project
+uvx harnessapi run
+```
+
+```bash
+curl -X POST http://localhost:8000/skills/greet \
+  -H "Content-Type: application/json" \
+  -H "Accept: application/json" \
+  -d '{"name": "world"}'
+# → {"message": "Hello, world! Welcome to harnessapi.", "length": 36}
+```
+
+---
+
+## What you get from one skill folder
+
+<CardGrid>
+  <Card title="Streaming HTTP endpoint" icon="rocket">
+    `POST /skills/{name}` — Server-Sent Events by default, plain JSON via `Accept` header. No routes to write.
+  </Card>
+  <Card title="MCP tool" icon="puzzle">
+    Every skill is automatically registered as a Model Context Protocol tool at `/mcp`. Plug into Claude Desktop, Cursor, or any agent in seconds.
+  </Card>
+  <Card title="OpenAPI docs" icon="document">
+    Full Swagger UI at `/docs` — generated from your Pydantic models. Zero extra configuration.
+  </Card>
+  <Card title="agentskills.io compatible" icon="approve-check">
+    Existing skill folders with `SKILL.md` are detected automatically. harnessapi is a superset of the agentskills.io standard.
+  </Card>
+</CardGrid>
+
+---
+
+## Works with the tools you already use
+
+<CardGrid>
+  <LinkCard title="Claude Desktop" description="Add your skills as MCP tools with one line of JSON config." href="/guides/claude-desktop/" />
+  <LinkCard title="Cursor" description="Connect your MCP server to Cursor and call skills from the AI chat." href="/guides/claude-desktop/" />
+  <LinkCard title="FastAPI ecosystem" description="harnessapi is a FastAPI subclass — all middleware, auth, and plugins work." href="/concepts/skill-folders/" />
+  <LinkCard title="agentskills.io" description="Convert existing skill folders with a single CLI command." href="/guides/convert-skill/" />
+</CardGrid>
+
+---
+
+## Built on
+
+- [FastAPI](https://fastapi.tiangolo.com) — the HTTP layer
+- [FastMCP](https://github.com/jlowin/fastmcp) — the MCP server
+- [Pydantic](https://docs.pydantic.dev) — input/output validation
+- [uv](https://docs.astral.sh/uv/) — packaging and CLI
