@@ -1,15 +1,16 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Awaitable, Callable, TYPE_CHECKING
+from typing import Any, Awaitable, Callable, TYPE_CHECKING
 
 from fastapi import Request
 
 from .registry import TenantSkillRegistry
+from .sandbox_registry import SandboxRegistry
 from .storage import InProcessStorageBackend, StorageBackend
 
 if TYPE_CHECKING:
-    pass
+    from .sandbox_providers.base import SandboxProvider
 
 
 @dataclass
@@ -17,7 +18,16 @@ class TenantBackend:
     """Configuration object that activates multi-tenancy in HarnessAPI.
 
     Pass an instance to HarnessAPI(tenant_backend=...) to enable per-tenant
-    skill variants and the /tenants/* management API.
+    skill variants, the /tenants/* management API, and optional per-tenant
+    sandbox execution.
+
+    Sandbox usage:
+        TenantBackend(
+            ...,
+            sandbox_registry=SandboxRegistry(),
+            sandbox_provider="local_subprocess",          # or "docker" / "kubernetes"
+            sandbox_provider_config={},                   # passed to provider __init__
+        )
     """
 
     tenant_extractor: Callable[[Request], Awaitable[str | None]]
@@ -29,3 +39,12 @@ class TenantBackend:
     auto_promote: bool = False
     max_variants_per_tenant_per_skill: int = 10
     sandbox_run_timeout_secs: float = 10.0
+    # Sandbox execution (optional)
+    sandbox_registry: SandboxRegistry | None = None
+    sandbox_provider: str | SandboxProvider | None = None
+    sandbox_provider_config: dict[str, Any] = field(default_factory=dict)
+
+    def get_sandbox_provider(self) -> SandboxProvider | None:
+        """Resolve sandbox_provider string or instance to a SandboxProvider."""
+        from .sandbox_providers import get_provider
+        return get_provider(self.sandbox_provider, self.sandbox_provider_config)

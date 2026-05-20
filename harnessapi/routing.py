@@ -14,14 +14,22 @@ from .streaming import make_sse_response
 if TYPE_CHECKING:
     from .skill import Skill
     from .multitenancy.registry import TenantSkillRegistry
+    from .multitenancy.sandbox_registry import SandboxRegistry
 
 
 class SkillRoute(APIRoute):
     """POST /skills/{name} — SSE by default, JSON when Accept: application/json."""
 
-    def __init__(self, skill: Skill, tenant_registry: TenantSkillRegistry | None = None, **kwargs) -> None:
+    def __init__(
+        self,
+        skill: Skill,
+        tenant_registry: TenantSkillRegistry | None = None,
+        sandbox_registry: SandboxRegistry | None = None,
+        **kwargs,
+    ) -> None:
         self._skill = skill
         self._tenant_registry = tenant_registry
+        self._sandbox_registry = sandbox_registry
         endpoint = self._make_endpoint()
         super().__init__(
             path=f"/skills/{skill.meta.name}",
@@ -36,22 +44,39 @@ class SkillRoute(APIRoute):
     def _make_endpoint(self):
         skill = self._skill
         tenant_registry = self._tenant_registry
+        sandbox_registry = self._sandbox_registry
 
         async def endpoint(request: Request):
             body = await request.json()
+            tenant_id = getattr(request.state, "tenant_id", None)
 
-            # Tenant-aware handler resolution
+            # Resolution order:
+            # 1. tenant has a sandbox → forward entire request to sandbox
+            # 2. tenant has a promoted variant → run in-process
+            # 3. base skill handler
+
+            if sandbox_registry is not None and tenant_id is not None:
+                conn = sandbox_registry.get(tenant_id)
+                if conn is not None:
+                    from .multitenancy.sandbox_client import sandbox_client
+                    try:
+                        result = await sandbox_client.forward(conn, skill.meta.name, body)
+                    except Exception as exc:
+                        return JSONResponse(
+                            status_code=502,
+                            content={"error": f"Sandbox error: {exc}"},
+                        )
+                    return JSONResponse(content=result)
+
             handler = skill.effective_handler
             is_streaming = skill.is_streaming_handler()
             timeout = skill.meta.timeout_secs
 
-            if tenant_registry is not None:
-                tenant_id = getattr(request.state, "tenant_id", None)
-                if tenant_id is not None:
-                    variant = tenant_registry.get_promoted(tenant_id, skill.meta.name)
-                    if variant is not None:
-                        handler = variant.handler
-                        is_streaming = variant.is_streaming_handler()
+            if tenant_registry is not None and tenant_id is not None:
+                variant = tenant_registry.get_promoted(tenant_id, skill.meta.name)
+                if variant is not None:
+                    handler = variant.handler
+                    is_streaming = variant.is_streaming_handler()
 
             try:
                 input_obj = skill.input_model.model_validate(body)

@@ -281,4 +281,101 @@ def build_tenant_router(backend: TenantBackend, base_skills: dict[str, Skill]) -
             raise HTTPException(status_code=404, detail="Variant not found")
         return JSONResponse(content={"source_code": variant.handler_source})
 
+    # ------------------------------------------------------------------
+    # Sandbox lifecycle endpoints (only registered when sandbox_registry set)
+    # ------------------------------------------------------------------
+
+    if backend.sandbox_registry is not None:
+        _sb_registry = backend.sandbox_registry
+
+        def _get_provider():
+            p = backend.get_sandbox_provider()
+            if p is None:
+                raise HTTPException(
+                    status_code=400,
+                    detail="No sandbox_provider configured on TenantBackend"
+                )
+            return p
+
+        @router.post("/{tenant_id}/sandbox/provision")
+        async def provision_sandbox(tenant_id: str, body: dict | None = None):
+            body = body or {}
+            existing = _sb_registry.get(tenant_id)
+            if existing is not None:
+                return JSONResponse(content={
+                    "tenant_id": tenant_id,
+                    "endpoint_url": existing.endpoint_url,
+                    "sandbox_type": existing.sandbox_type,
+                    "status": "already_running",
+                })
+            provider = _get_provider()
+            skills_dir = body.get("skills_dir", "")
+            conn = await provider.provision(tenant_id, skills_dir)
+            _sb_registry.register(conn)
+            if hasattr(backend.storage, "save_sandbox"):
+                await backend.storage.save_sandbox(conn)
+            return JSONResponse(content={
+                "tenant_id": tenant_id,
+                "endpoint_url": conn.endpoint_url,
+                "sandbox_type": conn.sandbox_type,
+                "pid": conn.pid,
+                "status": "running",
+            })
+
+        @router.delete("/{tenant_id}/sandbox")
+        async def teardown_sandbox(tenant_id: str):
+            conn = _sb_registry.get(tenant_id)
+            if conn is None:
+                raise HTTPException(status_code=404, detail=f"No sandbox for tenant {tenant_id!r}")
+            provider = _get_provider()
+            await provider.teardown(conn)
+            _sb_registry.deregister(tenant_id)
+            if hasattr(backend.storage, "delete_sandbox"):
+                await backend.storage.delete_sandbox(tenant_id)
+            return JSONResponse(content={"status": "torn_down", "tenant_id": tenant_id})
+
+        @router.get("/{tenant_id}/sandbox/health")
+        async def sandbox_health(tenant_id: str):
+            conn = _sb_registry.get(tenant_id)
+            if conn is None:
+                return JSONResponse(content={"status": "not_provisioned", "tenant_id": tenant_id})
+            from .sandbox_client import sandbox_client as _sc
+            healthy = await _sc.health_check(conn)
+            return JSONResponse(content={
+                "status": "healthy" if healthy else "unreachable",
+                "tenant_id": tenant_id,
+                "endpoint_url": conn.endpoint_url,
+                "last_seen": conn.last_seen.isoformat() if conn.last_seen else None,
+            })
+
+        @router.post("/{tenant_id}/skills/{skill_name}/push-to-sandbox")
+        async def push_to_sandbox(tenant_id: str, skill_name: str):
+            _get_base_skill(skill_name)
+            conn = _sb_registry.get(tenant_id)
+            if conn is None:
+                raise HTTPException(
+                    status_code=404,
+                    detail=f"No sandbox registered for tenant {tenant_id!r}. Call /provision first.",
+                )
+            # Find promoted variant to push (if none, push base skill source)
+            variant = backend.registry.get_promoted(tenant_id, skill_name)
+            if variant is not None:
+                source = variant.handler_source
+            else:
+                base = base_skills.get(skill_name)
+                source = ""
+                if base and base.folder:
+                    hp = base.folder / "handler.py"
+                    if hp.exists():
+                        source = hp.read_text()
+
+            from .sandbox_client import sandbox_client as _sc
+            await _sc.push_skill(conn, skill_name, source)
+            return JSONResponse(content={
+                "status": "pushed",
+                "skill_name": skill_name,
+                "tenant_id": tenant_id,
+                "endpoint_url": conn.endpoint_url,
+            })
+
     return router

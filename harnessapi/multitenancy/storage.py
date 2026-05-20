@@ -76,6 +76,17 @@ CREATE TABLE IF NOT EXISTS skill_variant (
 );
 CREATE INDEX IF NOT EXISTS idx_tenant_skill
     ON skill_variant(tenant_id, base_skill_name, status);
+
+CREATE TABLE IF NOT EXISTS sandbox_connection (
+    tenant_id    TEXT PRIMARY KEY,
+    endpoint_url TEXT NOT NULL,
+    sandbox_type TEXT NOT NULL,
+    pid          INTEGER,
+    auth_token   TEXT,
+    metadata_json TEXT DEFAULT '{}',
+    created_at   TEXT NOT NULL,
+    last_seen    TEXT
+);
 """
 
 
@@ -160,6 +171,47 @@ class SQLiteStorageBackend(StorageBackend):
             ).fetchall()
         return [_row_to_partial_variant(row) for row in rows]
 
+    # ------------------------------------------------------------------
+    # Sandbox connection persistence
+    # ------------------------------------------------------------------
+
+    async def save_sandbox(self, conn_obj) -> None:
+        """Persist a SandboxConnection. conn_obj is a SandboxConnection dataclass."""
+        with self._conn() as conn:
+            conn.execute(
+                """INSERT OR REPLACE INTO sandbox_connection
+                   (tenant_id, endpoint_url, sandbox_type, pid, auth_token,
+                    metadata_json, created_at, last_seen)
+                   VALUES (?,?,?,?,?,?,?,?)""",
+                (
+                    conn_obj.tenant_id,
+                    conn_obj.endpoint_url,
+                    conn_obj.sandbox_type,
+                    conn_obj.pid,
+                    conn_obj.auth_token,
+                    json.dumps(conn_obj.metadata),
+                    conn_obj.created_at.isoformat(),
+                    conn_obj.last_seen.isoformat() if conn_obj.last_seen else None,
+                ),
+            )
+
+    async def load_sandboxes(self) -> list:
+        """Load all persisted sandbox connections as raw dicts (no live process state)."""
+        with self._conn() as conn:
+            rows = conn.execute("SELECT * FROM sandbox_connection").fetchall()
+        return [_row_to_sandbox_dict(row) for row in rows]
+
+    async def update_sandbox_last_seen(self, tenant_id: str, ts: str) -> None:
+        with self._conn() as conn:
+            conn.execute(
+                "UPDATE sandbox_connection SET last_seen=? WHERE tenant_id=?",
+                (ts, tenant_id),
+            )
+
+    async def delete_sandbox(self, tenant_id: str) -> None:
+        with self._conn() as conn:
+            conn.execute("DELETE FROM sandbox_connection WHERE tenant_id=?", (tenant_id,))
+
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -211,3 +263,16 @@ def _row_to_partial_variant(row) -> _PartialVariant:
         created_at=row["created_at"],
         meta_overrides=json.loads(row["meta_overrides_json"] or "{}"),
     )
+
+
+def _row_to_sandbox_dict(row) -> dict:
+    return {
+        "tenant_id": row["tenant_id"],
+        "endpoint_url": row["endpoint_url"],
+        "sandbox_type": row["sandbox_type"],
+        "pid": row["pid"],
+        "auth_token": row["auth_token"],
+        "metadata": json.loads(row["metadata_json"] or "{}"),
+        "created_at": row["created_at"],
+        "last_seen": row["last_seen"],
+    }
