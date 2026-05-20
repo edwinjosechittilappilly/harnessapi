@@ -11,11 +11,18 @@ if TYPE_CHECKING:
 
 @dataclass
 class SkillMeta:
+    # core
     name: str
     description: str
     is_mcp: bool = True
     tags: list[str] = field(default_factory=list)
     timeout_secs: float | None = 30.0
+    # agentskills.io standard fields
+    license: str | None = None
+    compatibility: str | None = None   # e.g. "Python 3.11+"
+    allowed_tools: list[str] = field(default_factory=list)
+    argument_hint: str | None = None
+    instructions: str | None = None    # full SKILL.md Markdown body
 
 
 @dataclass

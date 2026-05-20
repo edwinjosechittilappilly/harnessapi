@@ -10,6 +10,7 @@ from typing import Iterator
 
 from .models import SkillInput, SkillOutput
 from .skill import Skill, SkillMeta
+from .skillcompat import parse_skill_md
 
 
 class SkillsDirectoryProvider:
@@ -29,7 +30,17 @@ class SkillsDirectoryProvider:
     def _load_skill(self, folder: Path) -> Skill | None:
         handler_path = folder / "handler.py"
         models_path = folder / "models.py"
+        has_skill_md = (folder / "SKILL.md").exists()
+
+        # agentskills.io-only folder (no handler/models) — skip for API exposure
         if not handler_path.exists() or not models_path.exists():
+            if has_skill_md:
+                import warnings
+                warnings.warn(
+                    f"Skill '{folder.name}' has SKILL.md but no handler.py/models.py "
+                    f"— skipped for API exposure. Run: harnessapi init --skill {folder}",
+                    stacklevel=2,
+                )
             return None
 
         meta = self._load_meta(folder)
@@ -84,20 +95,38 @@ class SkillsDirectoryProvider:
         return pkg
 
     def _load_meta(self, folder: Path) -> SkillMeta:
+        # Priority: skill.toml > SKILL.md > folder name / handler docstring
+
+        # 1. Parse SKILL.md (agentskills.io standard)
+        skill_md_path = folder / "SKILL.md"
+        md_data, instructions = parse_skill_md(skill_md_path)
+
+        # 2. Parse skill.toml (harnessapi extension — overrides SKILL.md)
         toml_path = folder / "skill.toml"
-        data: dict = {}
+        toml_data: dict = {}
         if toml_path.exists():
             with toml_path.open("rb") as f:
                 raw = tomllib.load(f)
-            data = raw.get("skill", {})
+            toml_data = raw.get("skill", {})
+
+        # Merge: toml wins over SKILL.md
+        def _get(key: str, default=None):
+            return toml_data.get(key, md_data.get(key, default))
+
         handler_path = folder / "handler.py"
-        description = data.get("description") or _extract_docstring(handler_path) or ""
+        description = _get("description") or _extract_docstring(handler_path) or ""
+
         return SkillMeta(
-            name=data.get("name", folder.name),
+            name=_get("name", folder.name),
             description=description,
-            is_mcp=data.get("is_mcp", True),
-            tags=data.get("tags", []),
-            timeout_secs=data.get("timeout_secs", 30.0),
+            is_mcp=_get("is_mcp", True),
+            tags=_get("tags", []),
+            timeout_secs=_get("timeout_secs", 30.0),
+            license=_get("license"),
+            compatibility=_get("compatibility"),
+            allowed_tools=_get("allowed-tools", []),
+            argument_hint=_get("argument-hint"),
+            instructions=instructions or None,
         )
 
     @staticmethod
