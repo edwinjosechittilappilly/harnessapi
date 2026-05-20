@@ -1,8 +1,10 @@
 <div align="center">
 
-# harnessapi — Python Skill Framework for MCP Tools and Streaming APIs
+# harnessapi
 
-### Write a skill. Get an API. Get an MCP tool. Ship.
+### Python Skill Framework for MCP Tools and Streaming APIs
+
+**Write a skill. Get an API. Get an MCP tool. Ship.**
 
 [![PyPI version](https://img.shields.io/pypi/v/harnessapi.svg "harnessapi on PyPI")](https://pypi.org/project/harnessapi/)
 [![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg "Requires Python 3.11 or higher")](https://www.python.org/)
