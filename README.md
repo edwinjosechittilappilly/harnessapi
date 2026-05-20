@@ -1,8 +1,9 @@
 <div align="center">
 
-<a href="https://edwinjosechittilappilly.github.io/harnessapi/">
-  <img src="https://raw.githubusercontent.com/edwinjosechittilappilly/harnessapi/main/assets/logo_long.png" alt="harnessapi" width="320" style="background:#0a0a0d;border-radius:12px;padding:16px" />
-</a>
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/edwinjosechittilappilly/harnessapi/main/assets/logo_long.png" />
+  <img src="https://edwinjosechittilappilly.github.io/harnessapi/harnessapi-light.png" alt="harnessapi" width="320" />
+</picture>
 
 ### Python Skill Framework for MCP Tools and Streaming APIs
 
