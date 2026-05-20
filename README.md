@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src="https://raw.githubusercontent.com/edwinjosechittilappilly/harnessapi/main/assets/banner.svg" alt="harnessapi" width="480" />
+<img src="https://raw.githubusercontent.com/edwinjosechittilappilly/harnessapi/main/assets/banner.png" alt="harnessapi" width="480" />
 
 ### Python Skill Framework for MCP Tools and Streaming APIs
 
@@ -321,7 +321,8 @@ app = HarnessAPI(skills_dir="./skills", enable_edit_endpoints=True)
 ```bash
 curl -X POST http://localhost:8000/skills/summarize/edit \
   -H "Content-Type: application/json" \
-  -d '{"source_code": "async def handle(input):\n    return Output(summary=input.text.upper())", "persist": true}'
+  -d '{"source_code": "async def handle(input):
+    return Output(summary=input.text.upper())", "persist": true}'
 ```
 
 > Disabled by default. Add auth middleware before enabling in production.
