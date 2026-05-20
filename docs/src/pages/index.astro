@@ -1,0 +1,346 @@
+---
+import StarlightPage from '@astrojs/starlight/components/StarlightPage.astro';
+---
+
+<StarlightPage frontmatter={{ title: 'harnessapi', template: 'splash', hero: { tagline: '' } }}>
+
+<div class="landing">
+
+  <!-- ── HERO ─────────────────────────────────────────────── -->
+  <section class="hero">
+    <div class="hero-mesh"></div>
+    <div class="hero-orb hero-orb-1"></div>
+    <div class="hero-orb hero-orb-2"></div>
+    <div class="hero-orb hero-orb-3"></div>
+
+    <div class="hero-content">
+      <div class="hero-badge">
+        <span>✦</span> v0.1.4 — now on PyPI
+      </div>
+
+      <h1 class="hero-title">
+        <span class="line1">Write a skill.</span>
+        <span class="line2">Get an API. Get an MCP tool.</span>
+      </h1>
+
+      <p class="hero-sub">
+        One Python folder. Zero boilerplate. Your skill becomes a streaming HTTP endpoint, an MCP tool for Claude and Cursor, and interactive docs — automatically.
+      </p>
+
+      <div class="hero-ctas">
+        <a href="/guides/quickstart/" class="btn-primary">
+          Get started → 60 seconds
+        </a>
+        <a href="https://github.com/edwinjosechittilappilly/harnessapi" class="btn-ghost" target="_blank">
+          ⭐ Star on GitHub
+        </a>
+      </div>
+
+      <!-- Terminal -->
+      <div class="terminal">
+        <div class="terminal-dots">
+          <span class="dot-r"></span>
+          <span class="dot-y"></span>
+          <span class="dot-g"></span>
+        </div>
+        <div class="terminal-line">
+          <span class="t-prompt">$</span>
+          <span class="t-cmd"> uvx harnessapi init my-project</span>
+        </div>
+        <div class="terminal-line t-out">  ✔ Scaffolding harnessapi project...</div>
+        <div class="terminal-line t-out">  created  skills/greet/handler.py</div>
+        <div class="terminal-line t-out">  created  skills/greet/models.py</div>
+        <div class="terminal-line t-out">  created  main.py</div>
+        <div class="terminal-line" style="margin-top:0.5rem">
+          <span class="t-prompt">$</span>
+          <span class="t-cmd"> uvx harnessapi run</span>
+        </div>
+        <div class="terminal-line t-green">  ✔ Streaming API  →  http://127.0.0.1:8000</div>
+        <div class="terminal-line t-cyan">  ✔ MCP server     →  http://127.0.0.1:8000/mcp</div>
+        <div class="terminal-line t-out">  ✔ Swagger docs   →  http://127.0.0.1:8000/docs</div>
+        <div class="terminal-line" style="margin-top:0.5rem">
+          <span class="t-prompt">$</span>
+          <span class="t-cmd"> curl -s -X POST /skills/greet -d '&#123;"name":"world"&#125;'</span>
+        </div>
+        <div class="terminal-line t-green">  &#123;"message":"Hello, world!","length":13&#125;</div>
+        <div class="terminal-line"><span class="cursor"></span></div>
+      </div>
+
+      <div class="badge-strip">
+        <span class="pill">Python 3.11+</span>
+        <span class="pill">MIT License</span>
+        <span class="pill">Built on FastAPI</span>
+        <span class="pill">Powered by FastMCP</span>
+        <span class="pill">agentskills.io compatible</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── ONE FOLDER → THREE THINGS ───────────────────────── -->
+  <section class="flow-section">
+    <div class="container">
+      <div class="section-label">How it works</div>
+      <h2 class="section-title">One skill folder → three things</h2>
+      <p class="section-sub">Drop a folder. harnessapi does the rest — no routes, no schemas, no MCP server config.</p>
+
+      <div class="flow-grid">
+        <div class="flow-card">
+          <div class="flow-card-label">📁 Your skill folder</div>
+          <pre>skills/greet/
+├── models.py
+├── handler.py
+└── skill.toml</pre>
+        </div>
+
+        <div class="flow-arrow">→</div>
+
+        <div class="flow-card" style="border-color: rgba(124,58,237,0.3);">
+          <div class="flow-card-label" style="color:#06b6d4;">⚡ Streaming HTTP API</div>
+          <pre style="color:#67e8f9;">POST /skills/greet
+↓
+event: result
+data: &#123;"message":"Hi!"&#125;
+
+event: done
+data:</pre>
+        </div>
+
+        <div class="flow-arrow">→</div>
+
+        <div class="flow-card" style="border-color: rgba(6,182,212,0.3);">
+          <div class="flow-card-label" style="color:#4ade80;">🤖 MCP Tool</div>
+          <pre style="color:#86efac;">&#123;
+  "mcpServers": &#123;
+    "my-skills": &#123;
+      "url": "localhost:8000/mcp"
+    &#125;
+  &#125;
+&#125;</pre>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── FEATURES ─────────────────────────────────────────── -->
+  <section class="features-section">
+    <div class="container">
+      <div class="section-label">Everything included</div>
+      <h2 class="section-title">Ship more. Configure less.</h2>
+      <p class="section-sub">Every feature works out of the box. No plugins, no wiring, no surprise dependencies.</p>
+
+      <div class="features-grid">
+        <div class="feature-card">
+          <div class="feature-icon">⚡</div>
+          <div class="feature-title">Streaming by default</div>
+          <p class="feature-desc">Server-Sent Events on every endpoint. Use <code>yield</code> to stream tokens, steps, or any output. Switch to JSON with one header.</p>
+        </div>
+        <div class="feature-card">
+          <div class="feature-icon">🤖</div>
+          <div class="feature-title">MCP tool — auto-registered</div>
+          <p class="feature-desc">Every skill appears as an MCP tool at <code>/mcp</code>. Claude Desktop, Cursor, and any MCP client connect in seconds.</p>
+        </div>
+        <div class="feature-card">
+          <div class="feature-icon">📖</div>
+          <div class="feature-title">OpenAPI docs — zero config</div>
+          <p class="feature-desc">Full Swagger UI at <code>/docs</code>. Generated from your Pydantic models. No decorators, no YAML.</p>
+        </div>
+        <div class="feature-card">
+          <div class="feature-icon">🛡️</div>
+          <div class="feature-title">Pydantic validation</div>
+          <p class="feature-desc">Invalid input is rejected with a 422 before your handler runs. No validation code to write.</p>
+        </div>
+        <div class="feature-card">
+          <div class="feature-icon">🔄</div>
+          <div class="feature-title">Hot-swap at runtime</div>
+          <p class="feature-desc">Push new handler code over HTTP without restarting. Opt-in edit endpoint for live patching in development.</p>
+        </div>
+        <div class="feature-card">
+          <div class="feature-icon">✦</div>
+          <div class="feature-title">agentskills.io compatible</div>
+          <p class="feature-desc">Existing skill folders with <code>SKILL.md</code> are detected automatically. Convert any agentskills.io skill with one CLI command.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── HOW IT WORKS (steps) ─────────────────────────────── -->
+  <section class="how-section">
+    <div class="container">
+      <div class="section-label">Step by step</div>
+      <h2 class="section-title">From zero to shipped</h2>
+      <p class="section-sub">Three steps. One command each. No docs to read to get started.</p>
+
+      <div class="steps">
+        <div class="step">
+          <div class="step-num-col">
+            <div class="step-num">1</div>
+            <div class="step-line"></div>
+          </div>
+          <div class="step-body">
+            <div class="step-title">Write your skill</div>
+            <p class="step-desc">Define input and output with Pydantic. Write your logic as an async function. Use <code>yield</code> to stream.</p>
+            <div class="code-block"><span class="cm"># models.py</span>
+<span class="kw">from</span> harnessapi <span class="kw">import</span> SkillInput, SkillOutput
+
+<span class="kw">class</span> <span class="cy">Input</span>(SkillInput):
+    text: <span class="cy">str</span>
+
+<span class="kw">class</span> <span class="cy">Output</span>(SkillOutput):
+    summary: <span class="cy">str</span>
+
+<span class="cm"># handler.py</span>
+<span class="kw">async def</span> <span class="cy">handle</span>(input: Input):
+    <span class="kw">async for</span> token <span class="kw">in</span> llm.stream(input.text):
+        <span class="kw">yield</span> token</div>
+          </div>
+        </div>
+
+        <div class="step">
+          <div class="step-num-col">
+            <div class="step-num">2</div>
+            <div class="step-line"></div>
+          </div>
+          <div class="step-body">
+            <div class="step-title">Run the server</div>
+            <p class="step-desc">One command. Auto-reload in dev. Your skill is live as HTTP + MCP + docs.</p>
+            <div class="code-block"><span class="t-prompt" style="color:#7c3aed;">$</span> harnessapi run
+
+Starting harnessapi  →  http://127.0.0.1:8000
+  <span class="st">✔ API</span>   POST /skills/summarize
+  <span class="cy">✔ MCP</span>   http://127.0.0.1:8000/mcp
+  <span class="st">✔ Docs</span>  http://127.0.0.1:8000/docs</div>
+          </div>
+        </div>
+
+        <div class="step">
+          <div class="step-num-col">
+            <div class="step-num">3</div>
+            <div class="step-line"></div>
+          </div>
+          <div class="step-body">
+            <div class="step-title">Use everywhere</div>
+            <p class="step-desc">Call via curl, connect Claude Desktop, or integrate with any MCP client. Same skill, everywhere.</p>
+            <div class="code-block"><span class="cm"># curl — streaming SSE</span>
+<span class="t-prompt" style="color:#7c3aed;">$</span> curl -X POST /skills/summarize \
+    -d '&#123;"text": "..."&#125;'
+
+event: chunk
+data: The key points are
+
+event: chunk
+data:  one, two, three.
+
+event: done
+
+<span class="cm"># Claude Desktop config</span>
+&#123; "mcpServers": &#123; "skills": &#123; "url": "http://localhost:8000/mcp" &#125; &#125; &#125;</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── WORKS WITH ────────────────────────────────────────── -->
+  <section class="works-section" style="padding: 3.5rem 1.5rem;">
+    <div class="container">
+      <p class="section-label" style="margin-bottom:2rem;">Works with</p>
+      <div class="works-row">
+        <a href="/guides/claude-desktop/" class="works-chip"><span class="icon">🤖</span> Claude Desktop</a>
+        <a href="/guides/claude-desktop/" class="works-chip"><span class="icon">⚡</span> Cursor</a>
+        <a href="https://fastapi.tiangolo.com" class="works-chip" target="_blank"><span class="icon">🚀</span> FastAPI</a>
+        <a href="https://github.com/jlowin/fastmcp" class="works-chip" target="_blank"><span class="icon">🔧</span> FastMCP</a>
+        <a href="https://docs.pydantic.dev" class="works-chip" target="_blank"><span class="icon">✅</span> Pydantic</a>
+        <a href="https://agentskills.io" class="works-chip" target="_blank"><span class="icon">✦</span> agentskills.io</a>
+        <a href="https://docs.astral.sh/uv/" class="works-chip" target="_blank"><span class="icon">📦</span> uv</a>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── CODE COMPARISON ──────────────────────────────────── -->
+  <section class="compare-section">
+    <div class="container">
+      <div class="section-label">Before &amp; after</div>
+      <h2 class="section-title">Kill the boilerplate</h2>
+      <p class="section-sub">What used to take 50+ lines of FastAPI + MCP setup now takes 4.</p>
+
+      <div class="compare-grid">
+        <div class="compare-card">
+          <div class="compare-header before">✗ Without harnessapi</div>
+          <div class="compare-body"><span class="cm"># FastAPI route</span>
+<span class="hi">from</span> fastapi <span class="hi">import</span> FastAPI
+<span class="hi">from</span> sse_starlette.sse <span class="hi">import</span> EventSourceResponse
+
+app = FastAPI()
+
+<span class="hi">@app.post</span>(<span class="gr">"/skills/summarize"</span>)
+<span class="hi">async def</span> summarize(body: dict):
+    <span class="hi">async def</span> generator():
+        <span class="hi">async for</span> token <span class="hi">in</span> llm.stream(body[<span class="gr">"text"</span>]):
+            <span class="hi">yield</span> &#123;<span class="gr">"event"</span>: <span class="gr">"chunk"</span>, <span class="gr">"data"</span>: token&#125;
+        <span class="hi">yield</span> &#123;<span class="gr">"event"</span>: <span class="gr">"done"</span>, <span class="gr">"data"</span>: <span class="gr">""</span>&#125;
+    <span class="hi">return</span> EventSourceResponse(generator())
+
+<span class="cm"># Separate MCP server setup</span>
+<span class="hi">from</span> fastmcp <span class="hi">import</span> FastMCP
+mcp = FastMCP(<span class="gr">"skills"</span>)
+
+<span class="hi">@mcp.tool</span>()
+<span class="hi">async def</span> summarize_tool(text: str) -&gt; str:
+    result = <span class="gr">""</span>
+    <span class="hi">async for</span> token <span class="hi">in</span> llm.stream(text):
+        result += token
+    <span class="hi">return</span> result
+
+<span class="cm"># 50+ more lines of wiring...</span></div>
+          <div class="line-count"><strong>50+ lines</strong> · two servers · manual schema · no docs</div>
+        </div>
+
+        <div class="compare-card" style="border-color: rgba(124,58,237,0.3);">
+          <div class="compare-header after">✓ With harnessapi</div>
+          <div class="compare-body"><span class="cm"># handler.py</span>
+<span class="hi">from</span> .models <span class="hi">import</span> Input
+
+<span class="hi">async def</span> handle(input: Input):
+    <span class="hi">async for</span> token <span class="hi">in</span> llm.stream(input.text):
+        <span class="hi">yield</span> token
+
+
+
+<span class="cm"># main.py</span>
+<span class="hi">from</span> harnessapi <span class="hi">import</span> HarnessAPI
+
+app = HarnessAPI(
+    skills_dir=<span class="gr">"./skills"</span>
+)
+
+
+<span class="cm"># That's it.</span>
+<span class="cm"># ✔ POST /skills/summarize  (SSE streaming)</span>
+<span class="cm"># ✔ MCP tool auto-registered</span>
+<span class="cm"># ✔ /docs Swagger UI</span>
+<span class="cm"># ✔ Pydantic validation</span></div>
+          <div class="line-count" style="color:#c4b5fd;"><strong>8 lines</strong> · one server · auto schema · auto docs · MCP</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── CTA ──────────────────────────────────────────────── -->
+  <section class="cta-section">
+    <div class="cta-glow"></div>
+    <div style="position:relative; z-index:1;">
+      <h2 class="cta-title">Ship your first skill<br/>in 60 seconds.</h2>
+      <p class="cta-sub">No account. No config. Just Python.</p>
+      <div class="cta-terminal">
+        <span class="t-prompt">$</span> uvx harnessapi init my-project
+      </div>
+      <div class="cta-btns">
+        <a href="/guides/quickstart/" class="btn-primary">Read the quick start →</a>
+        <a href="https://github.com/edwinjosechittilappilly/harnessapi" class="btn-ghost" target="_blank">⭐ Star on GitHub</a>
+      </div>
+    </div>
+  </section>
+
+</div>
+
+</StarlightPage>
