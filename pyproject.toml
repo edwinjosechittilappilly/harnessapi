@@ -44,9 +44,6 @@ harnessapi = "harnessapi.cli:main"
 [tool.hatch.build.targets.wheel]
 packages = ["harnessapi"]
 
-[tool.hatch.build.targets.wheel.force-include]
-"harnessapi/.agents" = "harnessapi/.agents"
-
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 testpaths = ["tests"]
