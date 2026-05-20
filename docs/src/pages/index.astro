@@ -1,0 +1,378 @@
+---
+// Standalone landing page — no Starlight chrome, full-bleed layout
+---
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>harnessapi — Skill in. API + MCP out.</title>
+  <meta name="description" content="A Python framework. One folder. Three live surfaces — streaming API, MCP tool, and OpenAPI docs." />
+  <meta property="og:type" content="website" />
+  <meta property="og:site_name" content="harnessapi" />
+  <meta property="og:title" content="harnessapi — Skill in. API + MCP out." />
+  <meta property="og:description" content="A Python framework. One folder. Three live surfaces." />
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="harnessapi — Skill in. API + MCP out." />
+  <meta name="twitter:description" content="A Python framework. One folder. Three live surfaces." />
+  <meta name="keywords" content="harnessapi, MCP, Model Context Protocol, FastAPI, streaming API, SSE, Python, LLM tools, agent framework, skill framework, Claude, Cursor" />
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600;700&family=Geist+Mono:wght@400;500;600&family=Instrument+Serif:ital@0;1&display=swap" />
+  <link rel="stylesheet" href="/landing.css" />
+  <script type="application/ld+json">{`{
+    "@context": "https://schema.org",
+    "@type": "SoftwareApplication",
+    "name": "harnessapi",
+    "description": "Python framework that turns a skill folder into a streaming HTTP API and an MCP tool simultaneously.",
+    "applicationCategory": "DeveloperApplication",
+    "operatingSystem": "Cross-platform",
+    "softwareVersion": "0.1.4",
+    "programmingLanguage": "Python",
+    "license": "https://opensource.org/licenses/MIT",
+    "url": "https://edwinjosechittilappilly.github.io/harnessapi/",
+    "downloadUrl": "https://pypi.org/project/harnessapi/",
+    "codeRepository": "https://github.com/edwinjosechittilappilly/harnessapi"
+  }`}</script>
+</head>
+<body>
+
+<!-- ── NAV ──────────────────────────────────────────────────── -->
+<header class="nav-v2">
+  <div class="nav-inner">
+    <a href="#top" class="nav-brand" aria-label="harnessapi home">
+      <svg width="24" height="24" viewBox="0 0 28 28" aria-hidden="true" class="h-mark">
+        <defs>
+          <linearGradient id="hg-nav" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0%" stop-color="oklch(0.55 0.22 285)" />
+            <stop offset="100%" stop-color="oklch(0.62 0.16 220)" />
+          </linearGradient>
+        </defs>
+        <rect x="3" y="5" width="4.5" height="19" rx="1.5" fill="currentColor" />
+        <rect x="15" y="1" width="4.5" height="23" rx="1.5" fill="url(#hg-nav)" />
+        <rect x="3" y="12" width="16.5" height="4" rx="1.2" fill="currentColor" />
+        <circle cx="23" cy="4" r="2" fill="oklch(0.62 0.16 220)" />
+      </svg>
+      <span class="wordmark"><span class="wm-harness">harness</span><span class="wm-api">api</span></span>
+    </a>
+    <nav class="nav-links">
+      <a href="#drop">Drop</a>
+      <a href="#mcp">MCP</a>
+      <a href="#quickstart">Start</a>
+      <a href="/guides/quickstart/">Docs</a>
+    </nav>
+    <a href="https://github.com/edwinjosechittilappilly/harnessapi" target="_blank" rel="noopener" class="nav-icon" aria-label="GitHub">
+      <svg width="17" height="17" viewBox="0 0 24 24" fill="currentColor">
+        <path d="M12 .5C5.65.5.5 5.65.5 12c0 5.08 3.29 9.39 7.86 10.91.57.1.78-.25.78-.55v-2.13c-3.2.7-3.87-1.36-3.87-1.36-.52-1.34-1.28-1.69-1.28-1.69-1.04-.71.08-.7.08-.7 1.16.08 1.77 1.19 1.77 1.19 1.03 1.76 2.7 1.25 3.36.96.1-.75.4-1.26.73-1.55-2.55-.29-5.24-1.28-5.24-5.7 0-1.26.45-2.29 1.19-3.09-.12-.29-.52-1.46.11-3.05 0 0 .97-.31 3.18 1.18a11.1 11.1 0 0 1 5.79 0c2.21-1.49 3.18-1.18 3.18-1.18.63 1.59.23 2.76.11 3.05.74.8 1.19 1.83 1.19 3.09 0 4.43-2.69 5.4-5.26 5.69.41.35.78 1.05.78 2.12v3.14c0 .31.21.66.79.55C20.21 21.38 23.5 17.08 23.5 12 23.5 5.65 18.35.5 12 .5z"/>
+      </svg>
+    </a>
+  </div>
+</header>
+
+<main>
+
+<!-- ── HERO ─────────────────────────────────────────────────── -->
+<section class="hero-v2" id="top">
+  <div class="container">
+
+    <a class="hero-brand fade-in" href="#top">
+      <svg width="62" height="62" viewBox="0 0 28 28" aria-hidden="true" class="h-mark">
+        <defs>
+          <linearGradient id="hg-hero" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0%" stop-color="oklch(0.55 0.22 285)" />
+            <stop offset="100%" stop-color="oklch(0.62 0.16 220)" />
+          </linearGradient>
+        </defs>
+        <rect x="3" y="5" width="4.5" height="19" rx="1.5" fill="currentColor" />
+        <rect x="15" y="1" width="4.5" height="23" rx="1.5" fill="url(#hg-hero)" />
+        <rect x="3" y="12" width="16.5" height="4" rx="1.2" fill="currentColor" />
+        <circle cx="23" cy="4" r="2" fill="oklch(0.62 0.16 220)" />
+      </svg>
+      <span class="wordmark"><span class="wm-harness">harness</span><span class="wm-api">api</span></span>
+    </a>
+
+    <h1 class="display center narrow fade-in">
+      Skill in.<br/>
+      <span class="grad">API + MCP out.</span>
+    </h1>
+
+    <p class="lede center fade-in">
+      A Python framework. One folder. Three live surfaces.
+    </p>
+
+    <div class="hero-cta-v2 fade-in">
+      <a class="btn-v2 btn-primary-v2" href="/guides/quickstart/">
+        Get started
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 5l7 7-7 7"/></svg>
+      </a>
+      <a class="btn-v2 btn-link-v2" href="/guides/quickstart/">
+        Read the docs →
+      </a>
+    </div>
+
+    <!-- Hero flow card -->
+    <div class="hero-prod fade-in">
+      <div class="flow">
+        <div class="flow-block">
+          <div class="fh">Skill folder</div>
+          <span class="line"><span class="name">summarize/</span></span>
+          <span class="line">&nbsp;&nbsp;models.py</span>
+          <span class="line">&nbsp;&nbsp;handler.py</span>
+          <span class="line">&nbsp;&nbsp;skill.toml</span>
+        </div>
+        <div class="flow-arrow">
+          <span class="lbl">harnessapi</span>
+          <svg viewBox="0 0 80 24" fill="none">
+            <path d="M2 12 H68" stroke="currentColor" stroke-width="1.4"/>
+            <path d="M62 7 L72 12 L62 17" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </div>
+        <div class="flow-block">
+          <div class="fh">Live surfaces</div>
+          <div class="endpoint-row"><span class="dot"></span><span class="method">POST</span><span class="fpath">/skills/*</span></div>
+          <div class="endpoint-row"><span class="dot"></span><span class="method">GET</span><span class="fpath">/mcp</span></div>
+          <div class="endpoint-row"><span class="dot"></span><span class="method">GET</span><span class="fpath">/docs</span></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Scroll hint -->
+    <div class="scroll-hint fade-in" aria-hidden="true">
+      <span class="scroll-label">Scroll</span>
+      <span class="scroll-line"></span>
+    </div>
+
+  </div>
+</section>
+
+<!-- ── 01 DROP ───────────────────────────────────────────────── -->
+<section class="story" id="drop">
+  <div class="container">
+    <span class="eyebrow-v2 fade-in">01 — Drop</span>
+    <h2 class="display center narrow fade-in">
+      Drop a folder.<br/>
+      <span class="grad">That's it.</span>
+    </h2>
+    <p class="lede center fade-in">
+      Three files. No decorators. No routes. No registration.
+    </p>
+    <div class="story-figure fade-in">
+      <div class="folder-card">
+        <div class="fc-title">skills / summarize</div>
+        <div class="file-row">
+          <span class="ic"></span>
+          <span class="fname">models.py</span>
+          <span class="note">Input + Output</span>
+        </div>
+        <div class="file-row">
+          <span class="ic"></span>
+          <span class="fname">handler.py</span>
+          <span class="note">Your logic</span>
+        </div>
+        <div class="file-row">
+          <span class="ic"></span>
+          <span class="fname">skill.toml</span>
+          <span class="note">Metadata · optional</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ── 02 API ────────────────────────────────────────────────── -->
+<section class="story" id="api">
+  <div class="container">
+    <span class="eyebrow-v2 fade-in">02 — API</span>
+    <h2 class="display center narrow fade-in">
+      Streams.<br/>
+      <span class="grad">By default.</span>
+    </h2>
+    <p class="lede center fade-in">
+      Server-Sent Events out of the box. Plain JSON with one header. Same handler.
+    </p>
+    <div class="story-figure fade-in">
+      <div class="api-card">
+        <span class="api-row"><span class="api-prompt">$</span> curl -X POST http://localhost:8000/skills/greet \</span>
+        <span class="api-row">&nbsp;&nbsp;&nbsp;&nbsp;-d '<span class="api-out">&#123;"name": "world"&#125;</span>'</span>
+        <div class="api-div"></div>
+        <span class="api-row"><span class="api-ev">event:</span> chunk</span>
+        <span class="api-row"><span class="api-ev">data:</span> Hello,</span>
+        <span class="api-row">&nbsp;</span>
+        <span class="api-row"><span class="api-ev">event:</span> chunk</span>
+        <span class="api-row"><span class="api-ev">data:</span> world!</span>
+        <span class="api-row">&nbsp;</span>
+        <span class="api-row"><span class="api-ev">event:</span> done</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ── 03 MCP (dark) ─────────────────────────────────────────── -->
+<section class="dark story" id="mcp">
+  <div class="container" style="position:relative;">
+    <span class="eyebrow-v2 fade-in">03 — MCP-native</span>
+    <h2 class="display center narrow fade-in">
+      Every skill,<br/>
+      <span class="grad">a tool.</span>
+    </h2>
+    <p class="lede center fade-in">
+      Mount once. Claude Desktop, Cursor, and Copilot discover every folder — automatically.
+    </p>
+    <div class="story-figure fade-in">
+      <div class="code-window-v2">
+        <div class="cw-head">
+          <div class="cw-lights"><span></span><span></span><span></span></div>
+          <div class="cw-filename">claude_desktop_config.json</div>
+        </div>
+        <pre><span class="mp">&#123;</span>
+  <span class="mk">"mcpServers"</span><span class="mp">:</span> <span class="mp">&#123;</span>
+    <span class="mk">"my-skills"</span><span class="mp">:</span> <span class="mp">&#123;</span>
+      <span class="mk">"url"</span><span class="mp">:</span> <span class="ms">"http://localhost:8000/mcp"</span>
+    <span class="mp">&#125;</span>
+  <span class="mp">&#125;</span>
+<span class="mp">&#125;</span></pre>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ── 04 QUICKSTART ─────────────────────────────────────────── -->
+<section class="story" id="quickstart" style="padding-bottom: 11rem;">
+  <div class="container" style="position:relative;">
+    <span class="eyebrow-v2 fade-in">04 — Ship</span>
+    <h2 class="display center narrow fade-in">
+      Three files.<br/>
+      <span class="grad">Sixty seconds.</span>
+    </h2>
+    <p class="lede center fade-in">
+      A working server, an MCP endpoint, and OpenAPI docs — from the time you finish typing.
+    </p>
+
+    <div class="cw-tabs fade-in" id="qs-tabs">
+      <button class="cw-tab" data-tab="0">models.py</button>
+      <button class="cw-tab active" data-tab="1">handler.py</button>
+      <button class="cw-tab" data-tab="2">main.py</button>
+    </div>
+
+    <div class="fade-in">
+      <div class="code-window-v2">
+        <div class="cw-head">
+          <div class="cw-lights"><span></span><span></span><span></span></div>
+          <div class="cw-filename" id="qs-filename">handler.py</div>
+        </div>
+        <pre id="qs-code"><span class="kw">from</span> .models <span class="kw">import</span> <span class="typ">Input</span>, <span class="typ">Output</span>
+
+<span class="kw">async def</span> <span class="fn">handle</span>(input: <span class="typ">Input</span>) -&gt; <span class="typ">Output</span>:
+    <span class="kw">return</span> <span class="typ">Output</span>(
+        summary=input.text[:input.max_length],
+    )
+
+<span class="com"># or yield to stream — same endpoint</span></pre>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ── CLOSING CTA ───────────────────────────────────────────── -->
+<section class="closing">
+  <div class="container">
+    <h2 class="display center narrow fade-in">
+      Write the thing.<br/>
+      <span class="grad">Everything else follows.</span>
+    </h2>
+    <button class="closing-cmd fade-in" id="copy-cmd" aria-label="Copy command">
+      <span style="color:oklch(0.78 0.14 205);">$</span>
+      <span>uvx harnessapi init my-project</span>
+      <svg id="copy-icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="opacity:0.5">
+        <rect x="9" y="9" width="13" height="13" rx="2"/>
+        <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+      </svg>
+    </button>
+    <div class="closing-hint fade-in" id="copy-hint">CLICK TO COPY</div>
+  </div>
+</section>
+
+</main>
+
+<!-- ── FOOTER ───────────────────────────────────────────────── -->
+<footer class="footer-v2">
+  <div class="footer-inner">
+    <a href="#top" class="footer-brand">
+      <span class="wordmark"><span class="wm-harness">harness</span><span class="wm-api">api</span></span>
+    </a>
+    <div class="footer-links">
+      <a href="/guides/quickstart/">Docs</a>
+      <a href="https://github.com/edwinjosechittilappilly/harnessapi" target="_blank" rel="noopener">GitHub</a>
+      <a href="https://pypi.org/project/harnessapi/" target="_blank" rel="noopener">PyPI</a>
+      <a href="https://modelcontextprotocol.io" target="_blank" rel="noopener">MCP</a>
+      <a href="https://agentskills.io" target="_blank" rel="noopener">agentskills.io</a>
+    </div>
+    <div>MIT · Python 3.11+</div>
+  </div>
+</footer>
+
+<script>
+// Scroll-reveal
+(function() {
+  const els = document.querySelectorAll('.fade-in');
+  const obs = new IntersectionObserver((entries) => {
+    entries.forEach(e => {
+      if (e.isIntersecting) { e.target.classList.add('in'); obs.unobserve(e.target); }
+    });
+  }, { threshold: 0.15, rootMargin: '0px 0px -8% 0px' });
+  els.forEach(el => obs.observe(el));
+})();
+
+// Quickstart tab switching
+(function() {
+  const codes = [
+    {
+      name: 'models.py',
+      html: '<span class="kw">from</span> harnessapi <span class="kw">import</span> <span class="typ">SkillInput</span>, <span class="typ">SkillOutput</span>\n\n<span class="kw">class</span> <span class="typ">Input</span>(<span class="typ">SkillInput</span>):\n    text: <span class="typ">str</span>\n    max_length: <span class="typ">int</span> = 200\n\n<span class="kw">class</span> <span class="typ">Output</span>(<span class="typ">SkillOutput</span>):\n    summary: <span class="typ">str</span>'
+    },
+    {
+      name: 'handler.py',
+      html: '<span class="kw">from</span> .models <span class="kw">import</span> <span class="typ">Input</span>, <span class="typ">Output</span>\n\n<span class="kw">async def</span> <span class="fn">handle</span>(input: <span class="typ">Input</span>) -&gt; <span class="typ">Output</span>:\n    <span class="kw">return</span> <span class="typ">Output</span>(\n        summary=input.text[:input.max_length],\n    )\n\n<span class="com"># or yield to stream — same endpoint</span>'
+    },
+    {
+      name: 'main.py',
+      html: '<span class="kw">from</span> harnessapi <span class="kw">import</span> <span class="typ">HarnessAPI</span>\n\napp = <span class="typ">HarnessAPI</span>(skills_dir=<span class="str">"./skills"</span>)\n\n<span class="com"># that\'s the whole server</span>'
+    }
+  ];
+  const tabs = document.querySelectorAll('#qs-tabs .cw-tab');
+  const codeEl = document.getElementById('qs-code');
+  const filenameEl = document.getElementById('qs-filename');
+  tabs.forEach(tab => {
+    tab.addEventListener('click', () => {
+      tabs.forEach(t => t.classList.remove('active'));
+      tab.classList.add('active');
+      const i = parseInt(tab.dataset.tab, 10);
+      codeEl.innerHTML = codes[i].html;
+      filenameEl.textContent = codes[i].name;
+    });
+  });
+})();
+
+// Copy-to-clipboard
+(function() {
+  const btn = document.getElementById('copy-cmd');
+  const hint = document.getElementById('copy-hint');
+  const icon = document.getElementById('copy-icon');
+  if (!btn) return;
+  btn.addEventListener('click', () => {
+    navigator.clipboard?.writeText('uvx harnessapi init my-project');
+    hint.textContent = '✓ COPIED';
+    icon.innerHTML = '<path d="M20 6L9 17l-5-5" stroke="oklch(0.78 0.14 145)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>';
+    icon.style.opacity = '1';
+    setTimeout(() => {
+      hint.textContent = 'CLICK TO COPY';
+      icon.innerHTML = '<rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>';
+      icon.style.opacity = '0.5';
+    }, 1600);
+  });
+})();
+</script>
+
+</body>
+</html>

@@ -1,0 +1,120 @@
+---
+title: "Web scraper"
+description: Wrap a web scraping function as a harnessapi skill — streaming scraped content and exposing it as an MCP tool.
+---
+
+import { Steps, Aside } from '@astrojs/starlight/components';
+
+This example wraps a `httpx` + `BeautifulSoup` web scraper as a streaming harnessapi skill. Each scraped section streams as an SSE chunk. Claude or Cursor can call it as an MCP tool to browse the web on your behalf.
+
+**What it demonstrates:**
+- Wrapping an existing Python function using `harnessapi init --function`
+- Streaming multi-section content
+- Real-world MCP tool usage with Claude
+
+---
+
+## Skill files
+
+```python title="skills/scrape/models.py"
+from harnessapi import SkillInput, SkillOutput
+
+class Input(SkillInput):
+    url: str
+    selector: str = "p"   # CSS selector for elements to extract
+
+class Output(SkillOutput):
+    content: str
+```
+
+```python title="skills/scrape/handler.py"
+"""Scrape a URL and stream each matched element's text."""
+import httpx
+from bs4 import BeautifulSoup
+from .models import Input
+
+async def handle(input: Input):
+    async with httpx.AsyncClient(follow_redirects=True, timeout=15) as client:
+        r = await client.get(input.url)
+        r.raise_for_status()
+
+    soup = BeautifulSoup(r.text, "html.parser")
+    elements = soup.select(input.selector)
+
+    if not elements:
+        yield f"No elements matched selector '{input.selector}'"
+        return
+
+    for el in elements:
+        text = el.get_text(strip=True)
+        if text:
+            yield text
+```
+
+```toml title="skills/scrape/skill.toml"
+[skill]
+description  = "Scrape a URL and stream matching element text. Use when asked to read, fetch, or browse a webpage."
+is_mcp       = true
+tags         = ["web", "scraping"]
+timeout_secs = 30
+```
+
+---
+
+## Run it
+
+<Steps>
+
+1. **Install**
+
+   ```bash
+   uv add harnessapi httpx beautifulsoup4
+   ```
+
+2. **Create `main.py` and run**
+
+   ```python title="main.py"
+   from pathlib import Path
+   from harnessapi import HarnessAPI
+
+   app = HarnessAPI(skills_dir=Path(__file__).parent / "skills")
+   ```
+
+   ```bash
+   harnessapi run
+   ```
+
+3. **Scrape a page**
+
+   ```bash
+   curl -X POST http://localhost:8000/skills/scrape \
+     -H "Content-Type: application/json" \
+     -d '{"url": "https://example.com", "selector": "p"}'
+   ```
+
+   ```
+   event: chunk
+   data: This domain is for use in illustrative examples in documents.
+
+   event: chunk
+   data: You may use this domain in literature without prior coordination.
+
+   event: done
+   data:
+   ```
+
+</Steps>
+
+## Generate from an existing function
+
+If you have a scraping function in `utils/scraper.py`, harnessapi can scaffold the whole skill:
+
+```bash
+harnessapi init --function utils/scraper.py --output skills
+```
+
+This inspects the function's type annotations and generates `models.py`, `handler.py`, `SKILL.md`, and `skill.toml` automatically.
+
+<Aside type="caution">
+  Always respect `robots.txt` and the site's terms of service when scraping.
+</Aside>

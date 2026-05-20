@@ -1,0 +1,127 @@
+---
+title: "Image captioner"
+description: Expose a vision LLM as a harnessapi skill — stream image captions via SSE and call it as an MCP tool from Claude Desktop.
+---
+
+import { Steps, Aside } from '@astrojs/starlight/components';
+
+This example wraps a GPT-4o vision call as a harnessapi skill. Pass an image URL, get a streaming caption back — over SSE or as a plain JSON response. Exposed as an MCP tool so Claude can caption images during a conversation.
+
+**What it demonstrates:**
+- Vision LLM integration (GPT-4o / Claude claude-haiku-4-5)
+- URL-based image input with Pydantic validation
+- Streaming multimodal output
+- MCP tool for image understanding
+
+---
+
+## Skill files
+
+```python title="skills/caption/models.py"
+from harnessapi import SkillInput, SkillOutput
+from pydantic import HttpUrl
+
+class Input(SkillInput):
+    image_url: HttpUrl
+    detail: str = "auto"   # low | high | auto
+    prompt: str = "Describe this image in detail."
+
+class Output(SkillOutput):
+    caption: str
+```
+
+```python title="skills/caption/handler.py"
+"""Caption an image URL using a vision LLM, streaming tokens."""
+import os
+from openai import AsyncOpenAI
+from .models import Input
+
+client = AsyncOpenAI(api_key=os.environ["OPENAI_API_KEY"])
+
+async def handle(input: Input):
+    stream = await client.chat.completions.create(
+        model="gpt-4o",
+        messages=[
+            {
+                "role": "user",
+                "content": [
+                    {
+                        "type": "image_url",
+                        "image_url": {
+                            "url": str(input.image_url),
+                            "detail": input.detail,
+                        },
+                    },
+                    {"type": "text", "text": input.prompt},
+                ],
+            }
+        ],
+        stream=True,
+    )
+    async for chunk in stream:
+        token = chunk.choices[0].delta.content
+        if token:
+            yield token
+```
+
+```toml title="skills/caption/skill.toml"
+[skill]
+description  = "Caption or describe an image from a URL using a vision LLM. Use when asked to describe, analyse, or caption an image."
+is_mcp       = true
+tags         = ["vision", "llm", "image"]
+timeout_secs = 60
+```
+
+---
+
+## Run it
+
+<Steps>
+
+1. **Install**
+
+   ```bash
+   uv add harnessapi openai
+   export OPENAI_API_KEY=sk-...
+   ```
+
+2. **Run**
+
+   ```bash
+   harnessapi run
+   ```
+
+3. **Caption an image**
+
+   ```bash
+   curl -X POST http://localhost:8000/skills/caption \
+     -H "Content-Type: application/json" \
+     -d '{
+       "image_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/4/47/PNG_transparency_demonstration_1.png/280px-PNG_transparency_demonstration_1.png",
+       "prompt": "What do you see?"
+     }'
+   ```
+
+   ```
+   event: chunk
+   data: The image shows several dice
+
+   event: chunk
+   data:  arranged on a transparent background,
+
+   event: chunk
+   data:  displaying various numbers on their faces.
+
+   event: done
+   data:
+   ```
+
+4. **Call from Claude Desktop**
+
+   After [connecting Claude to your MCP server](/guides/claude-desktop/), Claude can caption any image you share in the conversation — just ask it to use the `caption` tool.
+
+</Steps>
+
+<Aside type="tip">
+  Swap `gpt-4o` for `claude-haiku-4-5` (via the Anthropic SDK) or any other vision model — the harnessapi handler pattern is the same.
+</Aside>

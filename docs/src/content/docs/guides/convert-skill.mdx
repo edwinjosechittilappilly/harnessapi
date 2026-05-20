@@ -1,0 +1,93 @@
+---
+title: Convert an agentskills.io skill
+description: How to convert an existing agentskills.io skill folder into a full harnessapi HTTP API and MCP tool.
+---
+
+import { Steps, Aside } from '@astrojs/starlight/components';
+
+harnessapi is a superset of the [agentskills.io](https://agentskills.io) standard. Any folder with a `SKILL.md` is a valid agentskills.io skill. Adding `handler.py` and `models.py` makes it a full harnessapi skill — a live HTTP endpoint and MCP tool.
+
+## One skill
+
+<Steps>
+
+1. **Start with an existing agentskills.io skill**
+
+   ```
+   .agents/skills/summarize/
+   └── SKILL.md
+   ```
+
+2. **Run `harnessapi init --skill`**
+
+   ```bash
+   harnessapi init --skill .agents/skills/summarize
+   ```
+
+   Output:
+   ```
+   Adding harnessapi layer to skill: summarize
+
+     created  .agents/skills/summarize/models.py
+     created  .agents/skills/summarize/handler.py
+     created  .agents/skills/summarize/skill.toml
+     created  main.py
+   ```
+
+3. **Implement the handler**
+
+   Open `handler.py` and replace the stub with your logic:
+
+   ```python title=".agents/skills/summarize/handler.py"
+   from .models import Input, Output
+
+   async def handle(input: Input) -> Output:
+       # TODO: implement
+       return Output(result=input.text[:100])
+   ```
+
+4. **Run**
+
+   ```bash
+   harnessapi run
+   ```
+
+</Steps>
+
+## Whole directory
+
+<Steps>
+
+1. **Convert every skill in a directory at once**
+
+   ```bash
+   harnessapi init --skills-dir .agents/skills
+   ```
+
+   This adds `handler.py`, `models.py`, and `skill.toml` stubs to every subfolder that has a `SKILL.md`, and generates a single `main.py` at the parent level.
+
+2. **Implement each handler**
+
+3. **Run**
+
+   ```bash
+   harnessapi run
+   ```
+
+</Steps>
+
+<Aside type="tip">
+  Existing files are never overwritten — re-running `init --skill` on a folder that already has `handler.py` will skip it safely.
+</Aside>
+
+## What stays unchanged
+
+harnessapi never modifies your `SKILL.md`. All agentskills.io tooling (Claude Code, Cursor, Copilot) continues to work exactly as before — harnessapi adds the API layer on top.
+
+## Metadata priority
+
+| Source | Priority |
+|--------|----------|
+| `skill.toml` | Highest — overrides everything |
+| `SKILL.md` frontmatter | Used when no `skill.toml` |
+| Folder name / docstring | Fallback |
