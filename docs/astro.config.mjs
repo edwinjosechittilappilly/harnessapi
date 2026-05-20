@@ -4,6 +4,8 @@ import starlight from '@astrojs/starlight';
 
 export default defineConfig({
   site: 'https://edwinjosechittilappilly.github.io/harnessapi',
+  base: '/harnessapi',
+  output: 'static',
   integrations: [
     starlight({
       title: 'harnessapi',
