@@ -77,6 +77,15 @@ export default defineConfig({
               'harnessapi, MCP, Model Context Protocol, FastAPI, streaming API, SSE, Python, LLM tools, agent framework, skill framework, Claude, Cursor',
           },
         },
+        { tag: 'link', attrs: { rel: 'preconnect', href: 'https://fonts.googleapis.com' } },
+        { tag: 'link', attrs: { rel: 'preconnect', href: 'https://fonts.gstatic.com', crossorigin: '' } },
+        {
+          tag: 'link',
+          attrs: {
+            rel: 'stylesheet',
+            href: 'https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600;700&family=Geist+Mono:wght@400;500;600&family=Instrument+Serif:ital@0;1&display=swap',
+          },
+        },
       ],
     }),
   ],
