@@ -6,18 +6,25 @@ on:
       - main
     paths:
       - pyproject.toml
+  pull_request:
+    paths:
+      - pyproject.toml
 
 jobs:
   sync:
     runs-on: ubuntu-latest
     permissions:
       contents: write
+      pull-requests: write
 
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
+          # PAT needed to push commits back to the PR branch
           token: ${{ secrets.GH_PAT }}
+          # For PRs, check out the actual branch (not the merge commit)
+          ref: ${{ github.head_ref || github.ref }}
 
       - name: Install uv
         uses: astral-sh/setup-uv@v4
@@ -30,7 +37,7 @@ jobs:
           uv lock
           uv sync --all-extras
 
-      - name: Commit updated lockfile
+      - name: Commit updated lockfile (push to branch)
         run: |
           git config user.name  "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
