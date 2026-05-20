@@ -26,6 +26,9 @@ export default defineConfig({
           'https://github.com/edwinjosechittilappilly/harnessapi/edit/main/docs/',
       },
       customCss: ['./src/styles/custom.css'],
+      components: {
+        SiteTitle: './src/components/SiteTitle.astro',
+      },
       sidebar: [
         {
           label: 'Get started',

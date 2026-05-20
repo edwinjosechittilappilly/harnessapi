@@ -1,0 +1,50 @@
+---
+const { siteTitleHref } = Astro.locals.starlightRoute;
+---
+
+<a href={siteTitleHref} class="site-title sl-flex" aria-label="harnessapi home">
+  <svg width="20" height="20" viewBox="0 0 28 28" aria-hidden="true" class="h-mark-nav">
+    <defs>
+      <linearGradient id="hg-sl" x1="0" y1="0" x2="1" y2="1">
+        <stop offset="0%" stop-color="oklch(0.55 0.22 285)" />
+        <stop offset="100%" stop-color="oklch(0.62 0.16 220)" />
+      </linearGradient>
+    </defs>
+    <rect x="3" y="5" width="4.5" height="19" rx="1.5" fill="currentColor" />
+    <rect x="15" y="1" width="4.5" height="23" rx="1.5" fill="url(#hg-sl)" />
+    <rect x="3" y="12" width="16.5" height="4" rx="1.2" fill="currentColor" />
+    <circle cx="23" cy="4" r="2" fill="oklch(0.62 0.16 220)" />
+  </svg>
+  <span class="wm-docs" translate="no">
+    <span class="wm-harness">harness</span><span class="wm-api">api</span>
+  </span>
+</a>
+
+<style>
+  .site-title {
+    align-items: center;
+    gap: 0.5rem;
+    text-decoration: none;
+    white-space: nowrap;
+    min-width: 0;
+  }
+  .h-mark-nav {
+    flex-shrink: 0;
+    color: var(--sl-color-text);
+  }
+  .wm-docs {
+    font-family: "Instrument Serif", serif;
+    font-style: italic;
+    font-weight: 400;
+    font-size: 1.25rem;
+    letter-spacing: -0.018em;
+    line-height: 1;
+  }
+  .wm-harness { color: var(--sl-color-text); }
+  .wm-api {
+    background: linear-gradient(135deg, oklch(0.55 0.22 285), oklch(0.62 0.16 220));
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+</style>
