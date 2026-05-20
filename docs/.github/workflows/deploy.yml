@@ -22,7 +22,7 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version-file: docs/.node-version
           cache: npm
           cache-dependency-path: docs/package-lock.json
 
@@ -32,7 +32,7 @@ jobs:
 
       - name: Build
         working-directory: docs
-        run: npm run build
+        run: node --version && npm run build
 
       - uses: actions/upload-pages-artifact@v3
         with:
