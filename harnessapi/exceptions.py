@@ -20,3 +20,15 @@ class SkillHandlerError(SkillAPIError):
 
 class EditNotAllowedError(SkillAPIError):
     """Raised when an edit is attempted but the endpoint is disabled."""
+
+
+class VariantNotFoundError(SkillAPIError):
+    """Raised when a tenant skill variant cannot be resolved."""
+
+
+class VariantValidationError(SkillAPIError):
+    """Raised when submitted variant source fails static validation."""
+
+
+class VariantPromotionError(SkillAPIError):
+    """Raised when a variant cannot be promoted (e.g. wrong status, schema mismatch)."""

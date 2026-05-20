@@ -7,8 +7,17 @@ from .exceptions import (
     SkillHandlerError,
     SkillNotFoundError,
     SkillValidationError,
+    VariantNotFoundError,
+    VariantPromotionError,
+    VariantValidationError,
 )
 from .models import SkillInput, SkillOutput
+from .multitenancy import (
+    InProcessStorageBackend,
+    SkillVariant,
+    SQLiteStorageBackend,
+    TenantBackend,
+)
 from .skill import Skill, SkillMeta
 
 __all__ = [
@@ -24,4 +33,11 @@ __all__ = [
     "SkillConflictError",
     "SkillHandlerError",
     "EditNotAllowedError",
+    "VariantNotFoundError",
+    "VariantValidationError",
+    "VariantPromotionError",
+    "TenantBackend",
+    "SkillVariant",
+    "InProcessStorageBackend",
+    "SQLiteStorageBackend",
 ]
