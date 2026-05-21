@@ -8,6 +8,7 @@ from pydantic import BaseModel
 
 if TYPE_CHECKING:
     from .skill import Skill
+    from .multitenancy.models import SkillVariant
 
 
 class EditRequest(BaseModel):
@@ -43,3 +44,20 @@ def apply_edit(skill: Skill, request: EditRequest) -> None:
         edit_dir = skill.folder / "edit"
         edit_dir.mkdir(exist_ok=True)
         (edit_dir / "handler.py").write_text(request.source_code)
+
+
+def apply_variant_edit(variant: SkillVariant, source_code: str) -> None:
+    """Validate source_code statically, then compile and hot-swap variant.handler.
+
+    Unlike apply_edit, this runs the AST validator before exec() to reject
+    obvious unsafe patterns. Use for agent-submitted code in multi-tenant mode.
+    """
+    from .multitenancy.sandbox import validate_handler_source, compile_variant_handler
+
+    violations = validate_handler_source(source_code)
+    if violations:
+        raise ValueError("Handler source failed validation: " + "; ".join(violations))
+
+    handler = compile_variant_handler(source_code, variant.base_skill_name, variant.variant_id)
+    variant.handler = handler
+    variant.handler_source = source_code
