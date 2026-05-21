@@ -14,6 +14,10 @@ from .exceptions import (
 from .models import SkillInput, SkillOutput
 from .multitenancy import (
     InProcessStorageBackend,
+    LocalSubprocessProvider,
+    SandboxConnection,
+    SandboxRegistry,
+    SandboxProvider,
     SkillVariant,
     SQLiteStorageBackend,
     TenantBackend,
@@ -40,4 +44,8 @@ __all__ = [
     "SkillVariant",
     "InProcessStorageBackend",
     "SQLiteStorageBackend",
+    "SandboxRegistry",
+    "SandboxConnection",
+    "SandboxProvider",
+    "LocalSubprocessProvider",
 ]

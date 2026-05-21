@@ -44,6 +44,7 @@ class HarnessAPI(FastAPI):
             async with mcp_app.lifespan(mcp_app):
                 if tenant_backend is not None:
                     await _load_tenant_variants(tenant_backend, self._skills)
+                    await _restore_sandbox_connections(tenant_backend)
                 if user_lifespan is not None:
                     async with user_lifespan(app):
                         yield
@@ -82,7 +83,10 @@ class HarnessAPI(FastAPI):
             raise SkillConflictError(f"Skill '{name}' is already registered")
         self._skills[name] = skill
         tenant_registry = self._tenant_backend.registry if self._tenant_backend else None
-        self.router.routes.append(SkillRoute(skill, tenant_registry=tenant_registry))
+        sandbox_registry = self._tenant_backend.sandbox_registry if self._tenant_backend else None
+        self.router.routes.append(
+            SkillRoute(skill, tenant_registry=tenant_registry, sandbox_registry=sandbox_registry)
+        )
         if self._enable_edit:
             self.router.routes.append(EditRoute(skill))
         register_skill_as_mcp_tool(self._mcp, skill)
@@ -125,3 +129,27 @@ async def _load_tenant_variants(tenant_backend: TenantBackend, base_skills: dict
             meta_overrides=p.meta_overrides,
         )
         tenant_backend.registry.set_promoted(variant)
+
+
+async def _restore_sandbox_connections(tenant_backend: TenantBackend) -> None:
+    """Restore sandbox connections from storage into the in-memory SandboxRegistry."""
+    if tenant_backend.sandbox_registry is None:
+        return
+    if not hasattr(tenant_backend.storage, "load_sandboxes"):
+        return
+    from datetime import datetime, timezone
+    from .multitenancy.sandbox_registry import SandboxConnection
+
+    rows = await tenant_backend.storage.load_sandboxes()
+    for row in rows:
+        conn = SandboxConnection(
+            tenant_id=row["tenant_id"],
+            endpoint_url=row["endpoint_url"],
+            sandbox_type=row["sandbox_type"],
+            pid=row.get("pid"),
+            auth_token=row.get("auth_token"),
+            metadata=row.get("metadata", {}),
+            created_at=datetime.fromisoformat(row["created_at"]),
+            last_seen=datetime.fromisoformat(row["last_seen"]) if row.get("last_seen") else None,
+        )
+        tenant_backend.sandbox_registry.register(conn)
