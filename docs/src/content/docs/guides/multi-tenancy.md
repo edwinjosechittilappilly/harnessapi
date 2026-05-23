@@ -17,8 +17,9 @@ POST /skills/greet   (X-Tenant-ID: user-a)
          ▼
    SkillRoute resolves:
    1. Does user-a have a sandbox?           → forward to sandbox process*
-   2. Does user-a have a promoted variant?  → run variant handler in-process
-   3. No variant, no sandbox               → use base skill handler
+   2. Does user-a have a preview variant?   → run preview handler in-process
+   3. Does user-a have a promoted variant?  → run variant handler in-process
+   4. No variant, no sandbox               → use base skill handler
 ```
 
 *The sandbox receives whichever handler was last pushed to it via `push-to-sandbox`. Call that endpoint after promoting a variant to keep the sandbox in sync.
@@ -161,6 +162,37 @@ backend = TenantBackend(
     auto_promote=True,
 )
 ```
+
+---
+
+## Preview — route real traffic without hard-promoting
+
+After sandbox testing, a variant can be set to `preview` status. Preview variants route real tenant calls — giving you live traffic exposure — without committing to a full promotion. Unlike promotion, setting a preview does **not** demote any currently promoted variant; the two coexist, with preview taking routing priority.
+
+```bash
+curl -X POST http://localhost:8000/tenants/user-a/skills/greet/variants/3f2a1.../preview
+```
+
+```json
+{
+  "variant_id": "3f2a1...",
+  "tenant_id": "user-a",
+  "base_skill_name": "greet",
+  "status": "preview"
+}
+```
+
+**Behavior:**
+
+- At most one preview per (tenant, skill) — setting a new preview displaces the previous one back to `sandbox` status.
+- The previously promoted variant (if any) remains promoted; preview sits ahead of it in the routing order.
+- To stop routing through the preview, demote it (`/demote`) or promote a different variant — either clears the preview slot.
+
+**Typical staging flow:**
+
+1. `clone` → `customize` → `run` (sandbox test)
+2. `preview` → real traffic hits the variant; monitor behavior
+3. `promote` → commit the variant as the permanent active handler
 
 ---
 
@@ -325,9 +357,10 @@ Available MCP tools:
 |---|---|
 | `clone_skill` | Copy base handler source as starting point |
 | `customize_skill` | Submit and validate modified handler source |
+| `preview_variant` | Route real tenant traffic through a variant without full promotion |
 | `promote_variant` | Make a variant the active handler for a tenant |
 | `demote_variant` | Move a promoted variant back to sandbox |
-| `run_variant` | Test a variant with input (sandbox or in-process) |
+| `run_variant` | Test a variant with input — forwards to sandbox if provisioned, otherwise runs in-process |
 | `get_variant_source` | Read current handler source for a variant |
 | `list_tenant_skills` | List all variants for a tenant |
 | `provision_sandbox` | Boot a per-tenant sandbox process |
@@ -335,7 +368,30 @@ Available MCP tools:
 | `sandbox_health` | Check if a sandbox is reachable |
 | `push_to_sandbox` | Deploy promoted variant handler to the sandbox |
 
-> **Security:** The admin MCP server has no authentication by default. Every tool can execute validated code on your server and manage any tenant's variants. You must protect `/admin-mcp` with authentication middleware before enabling in production. Never expose it on a public network without auth.
+> **Security:** The admin MCP server has no authentication by default. Every tool can execute validated code on your server and manage any tenant's variants. You must protect `/admin-mcp` before enabling in production. Never expose it on a public network without auth.
+
+### Protecting /admin-mcp
+
+Pass an async callable to `admin_mcp_auth`. It receives the request and a `call_next` function — return a 4xx response to reject, or `await call_next(request)` to allow:
+
+```python
+import os
+from starlette.responses import JSONResponse
+
+async def require_api_key(request, call_next):
+    if request.headers.get("X-Admin-Key") != os.environ["ADMIN_KEY"]:
+        return JSONResponse({"detail": "Forbidden"}, status_code=403)
+    return await call_next(request)
+
+app = HarnessAPI(
+    skills_dir="./skills",
+    tenant_backend=backend,
+    enable_admin_mcp=True,
+    admin_mcp_auth=require_api_key,
+)
+```
+
+Any callable with the signature `async (request, call_next) -> Response` works — use JWT verification, IP allowlisting, or any other check.
 
 ---
 
@@ -344,10 +400,20 @@ Available MCP tools:
 | Backend | Persistence | When to use |
 |---|---|---|
 | `InProcessStorageBackend` | None (memory only) | Dev, testing |
+| `LocalFileStorageBackend` | JSON files in a directory | Single-worker, no DB |
 | `SQLiteStorageBackend` | SQLite file | Single-worker production |
 | Custom (implement the protocol) | Whatever you need | Postgres, Redis, etc. |
 
-Variants survive server restarts with `SQLiteStorageBackend` — promoted variants are reloaded and recompiled at startup.
+Variants survive server restarts with `LocalFileStorageBackend` or `SQLiteStorageBackend` — promoted and preview variants are reloaded and recompiled at startup.
+
+**`LocalFileStorageBackend` usage:**
+
+```python
+from harnessapi.multitenancy import LocalFileStorageBackend
+
+storage = LocalFileStorageBackend(variants_dir="./variants")
+# Each variant stored as ./variants/{variant_id}.json
+```
 
 **Custom backend example (Postgres):**
 
@@ -355,10 +421,12 @@ Variants survive server restarts with `SQLiteStorageBackend` — promoted varian
 class PostgresStorageBackend:
     async def save_variant(self, variant): ...
     async def load_promoted_variants(self): ...
+    async def load_preview_variants(self): ...
     async def load_sandbox_variant(self, variant_id): ...
     async def delete_variant(self, variant_id): ...
     async def promote_variant(self, variant_id): ...
     async def demote_variant(self, variant_id): ...
+    async def preview_variant(self, variant_id): ...
     async def list_variants(self, tenant_id): ...
 ```
 
@@ -374,9 +442,10 @@ No base class required — structural protocol.
 |---|---|---|
 | `POST` | `/tenants/{tenant_id}/skills/{name}/clone` | Copy base source as sandbox variant |
 | `POST` | `/tenants/{tenant_id}/skills/{name}/customize` | Submit source → validate → store |
-| `POST` | `/tenants/{tenant_id}/skills/{name}/variants/{id}/promote` | Make variant active for tenant |
+| `POST` | `/tenants/{tenant_id}/skills/{name}/variants/{id}/preview` | Set as preview — routes real traffic, coexists with promoted |
+| `POST` | `/tenants/{tenant_id}/skills/{name}/variants/{id}/promote` | Make variant active for tenant (demotes previous) |
 | `POST` | `/tenants/{tenant_id}/skills/{name}/variants/{id}/demote` | Move back to sandbox |
-| `POST` | `/tenants/{tenant_id}/skills/{name}/variants/{id}/run` | Test with input (returns output or error) |
+| `POST` | `/tenants/{tenant_id}/skills/{name}/variants/{id}/run` | Test with input — forwards to sandbox if provisioned, else in-process |
 | `DELETE` | `/tenants/{tenant_id}/skills/{name}/variants/{id}` | Delete variant |
 
 ### Introspection
@@ -454,5 +523,6 @@ With this config an agent can:
 1. Call `provision_sandbox` (MCP) → sandbox is running
 2. Call `customize_skill` (MCP) → variant validated and stored
 3. Call `run_variant` (MCP) → test input forwarded to sandbox
-4. Call `promote_variant` (MCP) → variant goes live for the tenant
-5. `POST /skills/{name}` with `X-Tenant-ID` → routed to the sandbox running the promoted variant
+4. Call `preview_variant` (MCP) → variant routes real tenant traffic (optional staging step)
+5. Call `promote_variant` (MCP) → variant becomes the permanent active handler
+6. `POST /skills/{name}` with `X-Tenant-ID` → routed to the sandbox running the promoted variant

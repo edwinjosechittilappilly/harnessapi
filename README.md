@@ -361,7 +361,10 @@ curl -X POST /tenants/user-a/skills/greet/customize \
 curl -X POST /tenants/user-a/skills/greet/variants/{id}/run -d '{"name": "Alice"}'
 # → {"message": "Howdy, Alice!"}
 
-# 4. Promote — all calls for this tenant now use the variant
+# 3b. Optional: set as preview — routes real tenant traffic without hard-promoting
+curl -X POST /tenants/user-a/skills/greet/variants/{id}/preview
+
+# 4. Promote — variant becomes the permanent active handler
 curl -X POST /tenants/user-a/skills/greet/variants/{id}/promote
 
 # 5. Route to variant automatically
@@ -387,9 +390,14 @@ backend = TenantBackend(
 **Optional: admin MCP server so agents manage variants as MCP tools:**
 
 ```python
-app = HarnessAPI(skills_dir="./skills", tenant_backend=backend, enable_admin_mcp=True)
+app = HarnessAPI(
+    skills_dir="./skills",
+    tenant_backend=backend,
+    enable_admin_mcp=True,
+    admin_mcp_auth=require_api_key,  # protect /admin-mcp in production
+)
 # Claude Desktop / Claude Code: add http://localhost:8000/admin-mcp as an MCP server
-# Tools: clone_skill, customize_skill, promote_variant, run_variant, provision_sandbox, ...
+# Tools: clone_skill, customize_skill, preview_variant, promote_variant, run_variant, provision_sandbox, ...
 ```
 
 > See the [multi-tenancy guide](docs/src/content/docs/guides/multi-tenancy.md) for the full API reference, sandbox providers, storage backends, and TenantBackend configuration.
@@ -408,8 +416,10 @@ app = HarnessAPI(skills_dir="./skills", tenant_backend=backend, enable_admin_mcp
 | Timeouts | Per-skill `timeout_secs` in `skill.toml` |
 | Hot-swap | Runtime handler replacement via opt-in edit endpoint |
 | Multi-tenancy | Per-user skill variants · promote/demote · SQLite or custom storage |
+| Preview status | Sandbox-tested variants route real tenant traffic before full promotion |
 | Per-user sandboxes | Local subprocess, Docker, or Kubernetes — pluggable `SandboxProvider` |
 | Admin MCP server | `/admin-mcp` · manage variants as MCP tools from Claude Desktop / Claude Code |
+| LocalFileStorageBackend | File-per-variant JSON storage, no DB deps |
 | agentskills.io | Drop-in compatible — existing skill folders just work |
 | CLI scaffold | `uvx harnessapi init` · `--skill` · `--skills-dir` · `--function` |
 
