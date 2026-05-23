@@ -1,0 +1,92 @@
+---
+title: Introduction
+description: harnessapi — the skill-first Python framework for streaming APIs and MCP tools. Write a capability. Get an HTTP endpoint, an MCP tool, and Swagger docs — simultaneously.
+---
+
+import { CardGrid, Card, Aside } from '@astrojs/starlight/components';
+
+**harnessapi** is a Python framework with a different starting point.
+
+Most frameworks start with routes. Most agent frameworks start with tool registrations. harnessapi starts with **skills** — self-contained capabilities with typed inputs, typed outputs, and an async handler. The HTTP endpoint, MCP tool, streaming, validation, and Swagger docs are all consequences. Not configuration.
+
+> Write the capability. Everything else follows.
+
+---
+
+## From one folder to three live surfaces
+
+Drop a folder. Run the server.
+
+```
+skills/summarize/
+├── models.py    ← Pydantic Input + Output
+├── handler.py   ← async handle() function
+└── skill.toml   ← description, tags, timeout
+```
+
+```bash
+harnessapi run
+```
+
+| Surface | Where |
+|---|---|
+| HTTP endpoint | `POST /skills/summarize` — SSE streaming by default |
+| MCP tool | `/mcp` — Claude Desktop, Claude Code, Cursor, Copilot |
+| Swagger UI | `/docs` — interactive, zero config |
+
+No routes to register. No tool schemas to write. No MCP server to maintain separately. Add another folder — get another endpoint and tool.
+
+---
+
+## The problem it solves
+
+Building an LLM-powered service means assembling the same scaffold every time: FastAPI routes, Pydantic models, SSE plumbing, MCP tool schema, multi-tenant routing, sandbox execution for untrusted code. Each layer is solvable alone — combining them is where the work piles up.
+
+harnessapi does the assembly. You write the handler. The framework derives the rest from the folder structure.
+
+---
+
+## Design principles
+
+| Principle | What it means |
+|---|---|
+| **Skill-first** | The capability is the unit. Routes and tool registrations are derived from it, not defined alongside it. |
+| **Zero boilerplate** | No decorators, no schema files, no separate server process. If you didn't write it in the skill folder, harnessapi handles it. |
+| **Streaming native** | SSE by default. Plain JSON with one header change. Same handler, same URL either way. |
+| **Agent-ready** | MCP tools, hot-swap, per-user variants, sandbox execution — built in from the start, not bolted on. |
+| **Composable** | harnessapi is a FastAPI subclass. All FastAPI middleware, routers, auth, and dependency injection work exactly as documented. |
+
+---
+
+## Built on FastAPI and FastMCP
+
+harnessapi is not a replacement for either — it is built on both and exposes them fully.
+
+- **FastAPI** handles HTTP routing, request validation, and the OpenAPI schema. Every harnessapi app *is* a FastAPI app.
+- **FastMCP** handles the MCP server. harnessapi auto-registers each skill as a FastMCP tool and mounts the server at `/mcp`.
+- **harnessapi** adds skill discovery, streaming conventions, multi-tenancy, and the CLI — the assembly layer that eliminates the scaffolding.
+
+---
+
+## Where to go next
+
+<CardGrid>
+  <Card title="Quick start" icon="rocket">
+    Get a streaming skill live in 60 seconds. [Start here →](/harnessapi/guides/quickstart)
+  </Card>
+  <Card title="Skill folders" icon="open-book">
+    Full folder structure — models, handlers, TOML config, multi-file skills. [Learn more →](/harnessapi/concepts/skill-folders)
+  </Card>
+  <Card title="Streaming (SSE)" icon="bars">
+    return vs yield, SSE event format, Python and JS clients. [Learn more →](/harnessapi/concepts/streaming)
+  </Card>
+  <Card title="MCP tools" icon="puzzle">
+    How skills become MCP tools. Connect Claude Desktop, Claude Code, Cursor. [Learn more →](/harnessapi/concepts/mcp)
+  </Card>
+  <Card title="Multi-tenancy" icon="setting">
+    Per-user variants, sandboxes, agent-driven customization. [Learn more →](/harnessapi/multi-tenancy)
+  </Card>
+  <Card title="Examples" icon="laptop">
+    Real implementations — factorial streaming, LLM summarizer, web scraper. [Browse →](/harnessapi/examples/factorial)
+  </Card>
+</CardGrid>
