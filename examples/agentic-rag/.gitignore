@@ -1,0 +1,6 @@
+.env
+chroma_data/
+variants.db
+__pycache__/
+*.pyc
+.venv/
