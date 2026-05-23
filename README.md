@@ -43,6 +43,7 @@ Drop the folder. Run the server. Your skill is live as an HTTP endpoint, an MCP 
 - [Example: streaming factorial](#example-streaming-factorial-sse--mcp)
 - [Skill folder reference](#skill-folder-reference)
 - [Hot-swap handlers at runtime](#hot-swap-handlers-at-runtime)
+- [Multi-tenancy & per-user skill variants](#multi-tenancy--per-user-skill-variants)
 - [Features](#features)
 - [Philosophy](#philosophy)
 - [See also](#see-also)
@@ -329,6 +330,72 @@ curl -X POST http://localhost:8000/skills/summarize/edit \
 
 ---
 
+## Multi-tenancy & per-user skill variants
+
+Add one parameter to `HarnessAPI(...)` and every skill gets per-user variants — same schema, different handler implementation, isolated routing. No restarts, no per-tenant route tables.
+
+```python
+from harnessapi import HarnessAPI
+from harnessapi.multitenancy import TenantBackend, SQLiteStorageBackend
+
+backend = TenantBackend(
+    tenant_extractor=lambda req: req.headers.get("X-Tenant-ID"),
+    storage=SQLiteStorageBackend(path="./variants.db"),
+)
+app = HarnessAPI(skills_dir="./skills", tenant_backend=backend)
+```
+
+All existing endpoints continue to work. A `/tenants/*` management API is added automatically.
+
+**Agent workflow — clone → customize → test → promote:**
+
+```bash
+# 1. Clone base skill source as starting point
+curl -X POST /tenants/user-a/skills/greet/clone
+
+# 2. Submit customized handler (validated before stored)
+curl -X POST /tenants/user-a/skills/greet/customize \
+  -d '{"source_code": "async def handle(input):\n    return Output(message=f\"Howdy, {input.name}!\")"}'
+
+# 3. Test variant in isolation
+curl -X POST /tenants/user-a/skills/greet/variants/{id}/run -d '{"name": "Alice"}'
+# → {"message": "Howdy, Alice!"}
+
+# 4. Promote — all calls for this tenant now use the variant
+curl -X POST /tenants/user-a/skills/greet/variants/{id}/promote
+
+# 5. Route to variant automatically
+curl -X POST /skills/greet -H "X-Tenant-ID: user-a" -d '{"name": "Alice"}'
+# → {"message": "Howdy, Alice!"}   ← variant handler
+
+curl -X POST /skills/greet -H "X-Tenant-ID: user-b" -d '{"name": "Bob"}'
+# → {"message": "Hello, Bob!"}     ← base handler
+```
+
+**Optional: per-user sandboxes for full process isolation:**
+
+```python
+from harnessapi.multitenancy import SandboxRegistry
+
+backend = TenantBackend(
+    ...,
+    sandbox_registry=SandboxRegistry(),
+    sandbox_provider="local_subprocess",  # or "docker" / "kubernetes"
+)
+```
+
+**Optional: admin MCP server so agents manage variants as MCP tools:**
+
+```python
+app = HarnessAPI(skills_dir="./skills", tenant_backend=backend, enable_admin_mcp=True)
+# Claude Desktop / Claude Code: add http://localhost:8000/admin-mcp as an MCP server
+# Tools: clone_skill, customize_skill, promote_variant, run_variant, provision_sandbox, ...
+```
+
+> See the [multi-tenancy guide](docs/src/content/docs/guides/multi-tenancy.md) for the full API reference, sandbox providers, storage backends, and TenantBackend configuration.
+
+---
+
 ## Features
 
 | Feature | Details |
@@ -340,6 +407,9 @@ curl -X POST http://localhost:8000/skills/summarize/edit \
 | Pydantic validation | Invalid input rejected before your handler runs |
 | Timeouts | Per-skill `timeout_secs` in `skill.toml` |
 | Hot-swap | Runtime handler replacement via opt-in edit endpoint |
+| Multi-tenancy | Per-user skill variants · promote/demote · SQLite or custom storage |
+| Per-user sandboxes | Local subprocess, Docker, or Kubernetes — pluggable `SandboxProvider` |
+| Admin MCP server | `/admin-mcp` · manage variants as MCP tools from Claude Desktop / Claude Code |
 | agentskills.io | Drop-in compatible — existing skill folders just work |
 | CLI scaffold | `uvx harnessapi init` · `--skill` · `--skills-dir` · `--function` |
 

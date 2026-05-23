@@ -211,6 +211,21 @@ def build_tenant_router(backend: TenantBackend, base_skills: dict[str, Skill]) -
         except ValidationError as exc:
             return JSONResponse(status_code=422, content={"detail": exc.errors()})
 
+        # Forward to sandbox if provisioned — test env matches production
+        if backend.sandbox_registry is not None:
+            conn = backend.sandbox_registry.get(tenant_id)
+            if conn is not None:
+                from .sandbox_client import sandbox_client as _sc
+                try:
+                    await _sc.push_skill(conn, skill_name, variant.handler_source)
+                    result = await _sc.forward(conn, skill_name, body, timeout=backend.sandbox_run_timeout_secs)
+                    return JSONResponse(content=result)
+                except Exception as exc:
+                    return JSONResponse(
+                        status_code=502,
+                        content={"error": f"Sandbox error: {exc}", "traceback": traceback.format_exc()},
+                    )
+
         try:
             timeout = backend.sandbox_run_timeout_secs
             if variant.is_streaming_handler():

@@ -28,6 +28,8 @@ class HarnessAPI(FastAPI):
         mcp_server_name: str = "HarnessAPI",
         enable_edit_endpoints: bool = False,
         tenant_backend: TenantBackend | None = None,
+        enable_admin_mcp: bool = False,
+        admin_mcp_path: str = "/admin-mcp",
         **fastapi_kwargs: Any,
     ) -> None:
         self._mcp = build_mcp_server(mcp_server_name)
@@ -39,17 +41,33 @@ class HarnessAPI(FastAPI):
         mcp_app = self._mcp.http_app(path="/")
         user_lifespan = fastapi_kwargs.pop("lifespan", None)
 
+        # Build admin MCP app eagerly (needs self._skills populated later, so deferred)
+        self._admin_mcp_app = None
+        self._enable_admin_mcp = enable_admin_mcp and tenant_backend is not None
+        self._admin_mcp_path = admin_mcp_path
+
         @asynccontextmanager
         async def merged_lifespan(app):
             async with mcp_app.lifespan(mcp_app):
-                if tenant_backend is not None:
-                    await _load_tenant_variants(tenant_backend, self._skills)
-                    await _restore_sandbox_connections(tenant_backend)
-                if user_lifespan is not None:
-                    async with user_lifespan(app):
-                        yield
+                if self._admin_mcp_app is not None:
+                    async with self._admin_mcp_app.lifespan(self._admin_mcp_app):
+                        if tenant_backend is not None:
+                            await _load_tenant_variants(tenant_backend, self._skills)
+                            await _restore_sandbox_connections(tenant_backend)
+                        if user_lifespan is not None:
+                            async with user_lifespan(app):
+                                yield
+                        else:
+                            yield
                 else:
-                    yield
+                    if tenant_backend is not None:
+                        await _load_tenant_variants(tenant_backend, self._skills)
+                        await _restore_sandbox_connections(tenant_backend)
+                    if user_lifespan is not None:
+                        async with user_lifespan(app):
+                            yield
+                    else:
+                        yield
 
         super().__init__(lifespan=merged_lifespan, **fastapi_kwargs)
 
@@ -72,6 +90,13 @@ class HarnessAPI(FastAPI):
         if tenant_backend is not None:
             from .multitenancy.router import build_tenant_router
             self.include_router(build_tenant_router(tenant_backend, self._skills))
+
+        # Mount admin MCP server (opt-in, only when tenant_backend is set)
+        if self._enable_admin_mcp:
+            from .multitenancy.admin_mcp import build_admin_mcp_server
+            admin_mcp = build_admin_mcp_server(tenant_backend, self._skills)
+            self._admin_mcp_app = admin_mcp.http_app(path="/")
+            self.mount(admin_mcp_path, self._admin_mcp_app)
 
         # Mount FastMCP ASGI app
         self.mount(mcp_path, mcp_app)

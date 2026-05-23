@@ -15,6 +15,8 @@ class TenantMiddleware(BaseHTTPMiddleware):
         self._extractor = extractor
 
     async def dispatch(self, request: Request, call_next) -> Response:
-        tenant_id = await self._extractor(request)
+        import inspect
+        result = self._extractor(request)
+        tenant_id = await result if inspect.isawaitable(result) else result
         request.state.tenant_id = tenant_id
         return await call_next(request)

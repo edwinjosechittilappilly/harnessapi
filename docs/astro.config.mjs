@@ -81,6 +81,7 @@ export default defineConfig({
             { label: 'Convert an agentskills.io skill', slug: 'guides/convert-skill' },
             { label: 'Connect to Claude Desktop', slug: 'guides/claude-desktop' },
             { label: 'Deploy to production', slug: 'guides/deploy' },
+            { label: 'Multi-tenancy & skill variants', slug: 'guides/multi-tenancy' },
           ],
         },
       ],
