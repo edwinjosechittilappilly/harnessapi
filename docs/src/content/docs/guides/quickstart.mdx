@@ -3,13 +3,15 @@ title: Quick start
 description: Get a streaming HTTP API and MCP tool running in 60 seconds with harnessapi.
 ---
 
-import { Steps, Code, Tabs, TabItem } from '@astrojs/starlight/components';
+import { Steps, Tabs, TabItem, Aside } from '@astrojs/starlight/components';
 
 Get a skill live as a streaming HTTP API and MCP tool in under 60 seconds.
 
+---
+
 ## Option A — Try it instantly with `uvx`
 
-No install needed. `uvx` runs harnessapi in an isolated environment:
+No install needed. `uvx` runs harnessapi in a temporary isolated environment:
 
 <Steps>
 
@@ -20,15 +22,47 @@ No install needed. `uvx` runs harnessapi in an isolated environment:
    cd my-project
    ```
 
+   This creates a project with a sample `greet` skill already wired up:
+
+   ```
+   my-project/
+   ├── skills/
+   │   └── greet/
+   │       ├── models.py    ← Input and Output models
+   │       ├── handler.py   ← your async handle() function
+   │       └── skill.toml   ← name, description, MCP config
+   └── main.py              ← HarnessAPI app entry point
+   ```
+
 2. **Start the server**
 
    ```bash
    uvx harnessapi run
    ```
 
+   harnessapi scans the `skills/` directory, registers the `greet` skill, and starts listening on port 8000. You'll see the skill and its endpoint logged to stdout.
+
 3. **Call your skill**
 
+   In a new terminal:
+
    ```bash
+   # Streaming response (default — SSE)
+   curl -X POST http://localhost:8000/skills/greet \
+     -H "Content-Type: application/json" \
+     -d '{"name": "world"}'
+   ```
+
+   ```
+   event: result
+   data: {"message": "Hello, world! Welcome to harnessapi.", "length": 36}
+
+   event: done
+   data:
+   ```
+
+   ```bash
+   # Plain JSON (add Accept header)
    curl -X POST http://localhost:8000/skills/greet \
      -H "Content-Type: application/json" \
      -H "Accept: application/json" \
@@ -41,7 +75,19 @@ No install needed. `uvx` runs harnessapi in an isolated environment:
 
 </Steps>
 
-Your skill is also available as an MCP tool at `http://localhost:8000/mcp` and has full Swagger docs at `http://localhost:8000/docs`.
+Your skill is also available as an MCP tool at `http://localhost:8000/mcp` and has interactive Swagger docs at `http://localhost:8000/docs`.
+
+---
+
+## What just happened?
+
+harnessapi discovered the `greet/` folder, read `models.py` to understand the input/output schema, and did three things automatically:
+
+1. Registered `POST /skills/greet` as an HTTP endpoint with SSE streaming
+2. Registered `greet` as an MCP tool at `/mcp` with the schema derived from `Input`
+3. Added the skill to the Swagger UI at `/docs` with a working "Try it out" button
+
+No routes to define. No tool schemas to write. The folder structure is the configuration.
 
 ---
 
@@ -87,6 +133,8 @@ Your skill is also available as an MCP tool at `http://localhost:8000/mcp` and h
        length: int
    ```
 
+   `SkillInput` is a Pydantic `BaseModel` with `extra="forbid"` — unknown fields are rejected before your handler runs.
+
 4. **Write your handler**
 
    ```python title="skills/greet/handler.py"
@@ -96,6 +144,8 @@ Your skill is also available as an MCP tool at `http://localhost:8000/mcp` and h
        message = f"Hello, {input.name}! Welcome to harnessapi."
        return Output(message=message, length=len(message))
    ```
+
+   `handle` is always an `async` function. Return a value for a single response, or `yield` chunks to stream.
 
 5. **Configure the skill**
 
@@ -126,16 +176,67 @@ Your skill is also available as an MCP tool at `http://localhost:8000/mcp` and h
 
 ---
 
+## Try streaming
+
+Change your handler to use `yield` and see streaming in action — no other changes needed:
+
+```python title="skills/greet/handler.py"
+from .models import Input, Output
+
+async def handle(input: Input):
+    words = f"Hello, {input.name}! Welcome to harnessapi.".split()
+    for word in words:
+        yield word + " "
+```
+
+Call it the same way — you'll now see each word arrive as a separate SSE chunk:
+
+```bash
+curl -X POST http://localhost:8000/skills/greet \
+  -H "Content-Type: application/json" \
+  -d '{"name": "world"}'
+```
+
+```
+event: chunk
+data: Hello,
+
+event: chunk
+data: world!
+
+event: chunk
+data: Welcome
+
+event: chunk
+data: to
+
+event: chunk
+data: harnessapi.
+
+event: done
+data:
+```
+
+The `Accept: application/json` header still works — harnessapi collects all chunks and returns `{"chunks": [...]}`. No code changes.
+
+---
+
 ## What's running
 
 | URL | What |
 |-----|------|
-| `POST http://localhost:8000/skills/greet` | HTTP endpoint (SSE stream) |
-| `GET http://localhost:8000/docs` | Swagger UI |
-| `http://localhost:8000/mcp` | MCP server |
+| `POST http://localhost:8000/skills/greet` | HTTP endpoint — SSE by default |
+| `GET http://localhost:8000/docs` | Swagger UI — interactive "Try it out" |
+| `http://localhost:8000/mcp` | MCP server — add to Claude Desktop or Cursor |
+
+---
 
 ## Next steps
 
-- Learn about [streaming with `yield`](/concepts/streaming/)
-- Connect to [Claude Desktop](/guides/claude-desktop/)
-- See real [examples](/examples/factorial/)
+| Topic | Why read it |
+|---|---|
+| [Skill folders](/harnessapi/concepts/skill-folders) | Full folder structure, naming, multi-file handlers, validation |
+| [Streaming (SSE)](/harnessapi/concepts/streaming) | SSE event format, Python and JS client examples, error handling |
+| [MCP tools](/harnessapi/concepts/mcp) | How to connect Claude Desktop, Claude Code, Cursor, Copilot |
+| [Examples](/harnessapi/examples/factorial) | Real skill implementations with real use cases |
+| [Multi-tenancy](/harnessapi/multi-tenancy) | Per-user skill variants, sandboxes, agent-driven customization |

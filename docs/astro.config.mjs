@@ -46,7 +46,7 @@ export default defineConfig({
         {
           label: 'Get started',
           items: [
-            { label: 'Introduction', slug: 'index' },
+            { label: 'Introduction', slug: 'introduction' },
             { label: 'Quick start', slug: 'guides/quickstart' },
             { label: 'Installation', slug: 'guides/installation' },
           ],
@@ -69,10 +69,15 @@ export default defineConfig({
           ],
         },
         {
-          label: 'CLI reference',
+          label: 'Multi-tenancy',
           items: [
-            { label: 'harnessapi init', slug: 'reference/init' },
-            { label: 'harnessapi run', slug: 'reference/run' },
+            { label: 'Overview', slug: 'multi-tenancy' },
+            { label: 'Variant lifecycle', slug: 'multi-tenancy/variants' },
+            { label: 'Preview & staging', slug: 'multi-tenancy/preview' },
+            { label: 'Per-user sandboxes', slug: 'multi-tenancy/sandboxes' },
+            { label: 'Storage backends', slug: 'multi-tenancy/storage' },
+            { label: 'Admin MCP server', slug: 'multi-tenancy/admin-mcp' },
+            { label: 'API reference', slug: 'multi-tenancy/api-reference' },
           ],
         },
         {
@@ -84,15 +89,10 @@ export default defineConfig({
           ],
         },
         {
-          label: 'Multi-tenancy',
+          label: 'CLI reference',
           items: [
-            { label: 'Overview', slug: 'multi-tenancy' },
-            { label: 'Variant lifecycle', slug: 'multi-tenancy/variants' },
-            { label: 'Preview & staging', slug: 'multi-tenancy/preview' },
-            { label: 'Per-user sandboxes', slug: 'multi-tenancy/sandboxes' },
-            { label: 'Storage backends', slug: 'multi-tenancy/storage' },
-            { label: 'Admin MCP server', slug: 'multi-tenancy/admin-mcp' },
-            { label: 'API reference', slug: 'multi-tenancy/api-reference' },
+            { label: 'harnessapi init', slug: 'reference/init' },
+            { label: 'harnessapi run', slug: 'reference/run' },
           ],
         },
       ],
