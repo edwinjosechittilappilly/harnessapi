@@ -8,7 +8,7 @@ from fastmcp import FastMCP
 from pydantic import ValidationError
 
 from .models import VariantSummary
-from .ops import VariantOpsError, op_clone, op_customize, op_demote, op_promote
+from .ops import VariantOpsError, op_clone, op_customize, op_demote, op_preview, op_promote
 
 if TYPE_CHECKING:
     from ..skill import Skill
@@ -75,6 +75,15 @@ def build_admin_mcp_server(
         """Move a promoted variant back to sandbox status."""
         try:
             resp = await op_demote(backend, base_skills, tenant_id, skill_name, variant_id)
+        except VariantOpsError as exc:
+            raise ValueError(str(exc)) from exc
+        return resp.model_dump()
+
+    @mcp.tool()
+    async def preview_variant(tenant_id: str, skill_name: str, variant_id: str) -> dict:
+        """Set a variant as preview so it routes real tenant calls without full promotion."""
+        try:
+            resp = await op_preview(backend, base_skills, tenant_id, skill_name, variant_id)
         except VariantOpsError as exc:
             raise ValueError(str(exc)) from exc
         return resp.model_dump()

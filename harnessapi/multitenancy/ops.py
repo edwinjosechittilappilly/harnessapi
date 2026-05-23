@@ -176,6 +176,32 @@ async def op_promote(
     )
 
 
+async def op_preview(
+    backend: TenantBackend,
+    base_skills: dict[str, Skill],
+    tenant_id: str,
+    skill_name: str,
+    variant_id: str,
+) -> VariantResponse:
+    if base_skills.get(skill_name) is None:
+        raise VariantOpsError(f"Base skill '{skill_name}' not found", status=404)
+
+    variant = backend.registry.get_variant(variant_id)
+    if variant is None or variant.tenant_id != tenant_id or variant.base_skill_name != skill_name:
+        raise VariantOpsError("Variant not found", status=404)
+
+    backend.registry.set_preview(variant)
+    variant.status = "preview"
+    await backend.storage.preview_variant(variant_id)
+
+    return VariantResponse(
+        variant_id=variant_id,
+        tenant_id=tenant_id,
+        base_skill_name=skill_name,
+        status="preview",
+    )
+
+
 async def op_demote(
     backend: TenantBackend,
     base_skills: dict[str, Skill],

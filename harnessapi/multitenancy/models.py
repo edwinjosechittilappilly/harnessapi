@@ -17,7 +17,7 @@ class SkillVariant:
     base_skill_name: str
     handler_source: str
     handler: Callable
-    status: Literal["sandbox", "promoted"]
+    status: Literal["sandbox", "preview", "promoted"]
     created_at: datetime
     input_model: type[SkillInput]
     output_model: type[SkillOutput]
@@ -34,7 +34,7 @@ class VariantResponse:
         variant_id: str,
         tenant_id: str,
         base_skill_name: str,
-        status: Literal["sandbox", "promoted"],
+        status: Literal["sandbox", "preview", "promoted"],
         source_code: str | None = None,
     ) -> None:
         self.variant_id = variant_id

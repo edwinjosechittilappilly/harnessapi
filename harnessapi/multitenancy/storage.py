@@ -19,10 +19,12 @@ class StorageBackend:
 
     async def save_variant(self, variant: SkillVariant) -> None: ...
     async def load_promoted_variants(self) -> list[SkillVariant]: ...
+    async def load_preview_variants(self) -> list[SkillVariant]: ...
     async def load_sandbox_variant(self, variant_id: str) -> SkillVariant | None: ...
     async def delete_variant(self, variant_id: str) -> None: ...
     async def promote_variant(self, variant_id: str) -> None: ...
     async def demote_variant(self, variant_id: str) -> None: ...
+    async def preview_variant(self, variant_id: str) -> None: ...
     async def list_variants(self, tenant_id: str) -> list[SkillVariant]: ...
 
 
@@ -42,6 +44,9 @@ class InProcessStorageBackend(StorageBackend):
     async def load_promoted_variants(self) -> list[SkillVariant]:
         return []  # nothing to restore; registry is in-memory only
 
+    async def load_preview_variants(self) -> list[SkillVariant]:
+        return []
+
     async def load_sandbox_variant(self, variant_id: str) -> SkillVariant | None:
         return None
 
@@ -55,6 +60,10 @@ class InProcessStorageBackend(StorageBackend):
     async def demote_variant(self, variant_id: str) -> None:
         if variant_id in self._store:
             self._store[variant_id]["status"] = "sandbox"
+
+    async def preview_variant(self, variant_id: str) -> None:
+        if variant_id in self._store:
+            self._store[variant_id]["status"] = "preview"
 
     async def list_variants(self, tenant_id: str) -> list[SkillVariant]:
         return []
@@ -70,7 +79,7 @@ CREATE TABLE IF NOT EXISTS skill_variant (
     tenant_id         TEXT NOT NULL,
     base_skill_name   TEXT NOT NULL,
     handler_source    TEXT NOT NULL,
-    status            TEXT NOT NULL CHECK(status IN ('sandbox','promoted')),
+    status            TEXT NOT NULL CHECK(status IN ('sandbox','preview','promoted')),
     created_at        TEXT NOT NULL,
     meta_overrides_json TEXT DEFAULT '{}'
 );
@@ -127,6 +136,13 @@ class SQLiteStorageBackend(StorageBackend):
             ).fetchall()
         return [_row_to_partial_variant(row) for row in rows]
 
+    async def load_preview_variants(self) -> list[SkillVariant]:
+        with self._conn() as conn:
+            rows = conn.execute(
+                "SELECT * FROM skill_variant WHERE status='preview'"
+            ).fetchall()
+        return [_row_to_partial_variant(row) for row in rows]
+
     async def load_sandbox_variant(self, variant_id: str) -> SkillVariant | None:
         with self._conn() as conn:
             row = conn.execute(
@@ -161,6 +177,13 @@ class SQLiteStorageBackend(StorageBackend):
         with self._conn() as conn:
             conn.execute(
                 "UPDATE skill_variant SET status='sandbox' WHERE variant_id=?",
+                (variant_id,),
+            )
+
+    async def preview_variant(self, variant_id: str) -> None:
+        with self._conn() as conn:
+            conn.execute(
+                "UPDATE skill_variant SET status='preview' WHERE variant_id=?",
                 (variant_id,),
             )
 
@@ -214,6 +237,93 @@ class SQLiteStorageBackend(StorageBackend):
 
 
 # ---------------------------------------------------------------------------
+# Local file (persistent, single-worker, no DB deps)
+# ---------------------------------------------------------------------------
+
+class LocalFileStorageBackend(StorageBackend):
+    """File-per-variant JSON storage under a directory. No extra deps — stdlib only."""
+
+    def __init__(self, variants_dir: str | Path) -> None:
+        self._dir = Path(variants_dir)
+        self._dir.mkdir(parents=True, exist_ok=True)
+
+    def _path(self, variant_id: str) -> Path:
+        return self._dir / f"{variant_id}.json"
+
+    def _read(self, variant_id: str) -> dict | None:
+        p = self._path(variant_id)
+        if not p.exists():
+            return None
+        return json.loads(p.read_text())
+
+    def _write(self, data: dict) -> None:
+        self._path(data["variant_id"]).write_text(json.dumps(data))
+
+    async def save_variant(self, variant: SkillVariant) -> None:
+        self._write(_variant_to_dict(variant))
+
+    async def load_promoted_variants(self) -> list[_PartialVariant]:
+        result = []
+        for p in self._dir.glob("*.json"):
+            try:
+                data = json.loads(p.read_text())
+            except (json.JSONDecodeError, OSError):
+                continue
+            if data.get("status") == "promoted":
+                result.append(_dict_to_partial_variant(data))
+        return result
+
+    async def load_preview_variants(self) -> list[_PartialVariant]:
+        result = []
+        for p in self._dir.glob("*.json"):
+            try:
+                data = json.loads(p.read_text())
+            except (json.JSONDecodeError, OSError):
+                continue
+            if data.get("status") == "preview":
+                result.append(_dict_to_partial_variant(data))
+        return result
+
+    async def load_sandbox_variant(self, variant_id: str) -> _PartialVariant | None:
+        data = self._read(variant_id)
+        if data is None or data.get("status") not in ("sandbox", "preview"):
+            return None
+        return _dict_to_partial_variant(data)
+
+    async def delete_variant(self, variant_id: str) -> None:
+        self._path(variant_id).unlink(missing_ok=True)
+
+    async def promote_variant(self, variant_id: str) -> None:
+        data = self._read(variant_id)
+        if data is not None:
+            data["status"] = "promoted"
+            self._write(data)
+
+    async def demote_variant(self, variant_id: str) -> None:
+        data = self._read(variant_id)
+        if data is not None:
+            data["status"] = "sandbox"
+            self._write(data)
+
+    async def preview_variant(self, variant_id: str) -> None:
+        data = self._read(variant_id)
+        if data is not None:
+            data["status"] = "preview"
+            self._write(data)
+
+    async def list_variants(self, tenant_id: str) -> list[_PartialVariant]:
+        result = []
+        for p in self._dir.glob("*.json"):
+            try:
+                data = json.loads(p.read_text())
+            except (json.JSONDecodeError, OSError):
+                continue
+            if data.get("tenant_id") == tenant_id:
+                result.append(_dict_to_partial_variant(data))
+        return result
+
+
+# ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
 
@@ -262,6 +372,18 @@ def _row_to_partial_variant(row) -> _PartialVariant:
         status=row["status"],
         created_at=row["created_at"],
         meta_overrides=json.loads(row["meta_overrides_json"] or "{}"),
+    )
+
+
+def _dict_to_partial_variant(data: dict) -> _PartialVariant:
+    return _PartialVariant(
+        variant_id=data["variant_id"],
+        tenant_id=data["tenant_id"],
+        base_skill_name=data["base_skill_name"],
+        handler_source=data["handler_source"],
+        status=data["status"],
+        created_at=data["created_at"],
+        meta_overrides=data.get("meta_overrides", {}),
     )
 
 

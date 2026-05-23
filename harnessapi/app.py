@@ -2,9 +2,11 @@ from __future__ import annotations
 
 from contextlib import asynccontextmanager
 from pathlib import Path
-from typing import Any, TYPE_CHECKING
+from typing import Any, Awaitable, Callable, TYPE_CHECKING
 
 from fastapi import FastAPI
+from starlette.requests import Request
+from starlette.responses import Response
 
 from .decorators import get_registered_skills
 from .discovery import SkillsDirectoryProvider
@@ -15,6 +17,39 @@ from .skill import Skill
 
 if TYPE_CHECKING:
     from .multitenancy.backend import TenantBackend
+
+
+class _AdminAuthWrapper:
+    """Thin ASGI wrapper that calls admin_mcp_auth before dispatching HTTP requests.
+
+    auth_fn signature: async (request, call_next) -> Response
+    If auth_fn returns a response directly (e.g. 403) the inner app is never called.
+    call_next forwards the request through the inner app using the real send callable
+    and returns a sentinel Response (the inner app writes directly to send).
+    """
+
+    def __init__(self, app, auth_fn: Callable[[Request, Callable], Awaitable[Response]]) -> None:
+        self._app = app
+        self._auth_fn = auth_fn
+
+    async def __call__(self, scope, receive, send) -> None:
+        if scope["type"] != "http":
+            await self._app(scope, receive, send)
+            return
+        request = Request(scope, receive)
+        _forwarded = False
+
+        async def call_next(req: Request) -> Response:
+            nonlocal _forwarded
+            _forwarded = True
+            await self._app(scope, receive, send)
+            # Return a sentinel — the inner app already wrote to send directly
+            return Response(b"")
+
+        response = await self._auth_fn(request, call_next)
+        if not _forwarded:
+            # Auth rejected — send the rejection response
+            await response(scope, receive, send)
 
 
 class HarnessAPI(FastAPI):
@@ -30,6 +65,7 @@ class HarnessAPI(FastAPI):
         tenant_backend: TenantBackend | None = None,
         enable_admin_mcp: bool = False,
         admin_mcp_path: str = "/admin-mcp",
+        admin_mcp_auth: Callable[[Request, Callable], Awaitable[Response]] | None = None,
         **fastapi_kwargs: Any,
     ) -> None:
         self._mcp = build_mcp_server(mcp_server_name)
@@ -95,7 +131,10 @@ class HarnessAPI(FastAPI):
             from .multitenancy.admin_mcp import build_admin_mcp_server
             admin_mcp = build_admin_mcp_server(tenant_backend, self._skills)
             self._admin_mcp_app = admin_mcp.http_app(path="/")
-            self.mount(admin_mcp_path, self._admin_mcp_app)
+            asgi_app = self._admin_mcp_app
+            if admin_mcp_auth is not None:
+                asgi_app = _AdminAuthWrapper(asgi_app, admin_mcp_auth)
+            self.mount(admin_mcp_path, asgi_app)
 
         # Mount FastMCP ASGI app
         self.mount(mcp_path, mcp_app)
@@ -125,34 +164,40 @@ class HarnessAPI(FastAPI):
 
 
 async def _load_tenant_variants(tenant_backend: TenantBackend, base_skills: dict[str, Skill]) -> None:
-    """Restore promoted variants from storage into the in-memory registry at startup."""
+    """Restore promoted and preview variants from storage into the in-memory registry at startup."""
     from datetime import datetime, timezone
     from .multitenancy.sandbox import compile_variant_handler
     from .multitenancy.models import SkillVariant
-    from .multitenancy.storage import _PartialVariant
 
-    partials = await tenant_backend.storage.load_promoted_variants()
-    for p in partials:
-        base = base_skills.get(p.base_skill_name)
-        if base is None:
-            continue  # base skill no longer exists; skip stale variant
-        try:
-            handler = compile_variant_handler(p.handler_source, p.base_skill_name, p.variant_id)
-        except ValueError:
-            continue  # corrupted source; skip
-        variant = SkillVariant(
-            variant_id=p.variant_id,
-            tenant_id=p.tenant_id,
-            base_skill_name=p.base_skill_name,
-            handler_source=p.handler_source,
-            handler=handler,
-            status="promoted",
-            created_at=datetime.fromisoformat(p.created_at_str),
-            input_model=base.input_model,
-            output_model=base.output_model,
-            meta_overrides=p.meta_overrides,
-        )
-        tenant_backend.registry.set_promoted(variant)
+    def _restore_partials(partials, status: str, register_fn):
+        for p in partials:
+            base = base_skills.get(p.base_skill_name)
+            if base is None:
+                continue
+            try:
+                handler = compile_variant_handler(p.handler_source, p.base_skill_name, p.variant_id)
+            except ValueError:
+                continue
+            variant = SkillVariant(
+                variant_id=p.variant_id,
+                tenant_id=p.tenant_id,
+                base_skill_name=p.base_skill_name,
+                handler_source=p.handler_source,
+                handler=handler,
+                status=status,
+                created_at=datetime.fromisoformat(p.created_at_str),
+                input_model=base.input_model,
+                output_model=base.output_model,
+                meta_overrides=p.meta_overrides,
+            )
+            register_fn(variant)
+
+    promoted = await tenant_backend.storage.load_promoted_variants()
+    _restore_partials(promoted, "promoted", tenant_backend.registry.set_promoted)
+
+    if hasattr(tenant_backend.storage, "load_preview_variants"):
+        preview = await tenant_backend.storage.load_preview_variants()
+        _restore_partials(preview, "preview", tenant_backend.registry.set_preview)
 
 
 async def _restore_sandbox_connections(tenant_backend: TenantBackend) -> None:
