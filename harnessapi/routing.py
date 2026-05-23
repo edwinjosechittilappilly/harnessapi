@@ -59,14 +59,21 @@ class SkillRoute(APIRoute):
                 conn = sandbox_registry.get(tenant_id)
                 if conn is not None:
                     from .multitenancy.sandbox_client import sandbox_client
-                    try:
-                        result = await sandbox_client.forward(conn, skill.meta.name, body)
-                    except Exception as exc:
-                        return JSONResponse(
-                            status_code=502,
-                            content={"error": f"Sandbox error: {exc}"},
+                    accept = request.headers.get("accept", "")
+                    if "application/json" in accept:
+                        try:
+                            result = await sandbox_client.forward(conn, skill.meta.name, body)
+                        except Exception as exc:
+                            return JSONResponse(
+                                status_code=502,
+                                content={"error": f"Sandbox error: {exc}"},
+                            )
+                        return JSONResponse(content=result)
+                    else:
+                        from sse_starlette.sse import EventSourceResponse
+                        return EventSourceResponse(
+                            sandbox_client.forward_sse(conn, skill.meta.name, body)
                         )
-                    return JSONResponse(content=result)
 
             handler = skill.effective_handler
             is_streaming = skill.is_streaming_handler()

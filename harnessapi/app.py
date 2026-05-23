@@ -28,6 +28,8 @@ class HarnessAPI(FastAPI):
         mcp_server_name: str = "HarnessAPI",
         enable_edit_endpoints: bool = False,
         tenant_backend: TenantBackend | None = None,
+        enable_admin_mcp: bool = False,
+        admin_mcp_path: str = "/admin-mcp",
         **fastapi_kwargs: Any,
     ) -> None:
         self._mcp = build_mcp_server(mcp_server_name)
@@ -39,17 +41,32 @@ class HarnessAPI(FastAPI):
         mcp_app = self._mcp.http_app(path="/")
         user_lifespan = fastapi_kwargs.pop("lifespan", None)
 
+        # Build admin MCP app eagerly (needs self._skills populated later, so deferred)
+        self._admin_mcp_app = None
+        self._enable_admin_mcp = enable_admin_mcp and tenant_backend is not None
+        self._admin_mcp_path = admin_mcp_path
+
+        @asynccontextmanager
+        async def _inner_lifespan(app):
+            if tenant_backend is not None:
+                await _load_tenant_variants(tenant_backend, self._skills)
+                await _restore_sandbox_connections(tenant_backend)
+            if user_lifespan is not None:
+                async with user_lifespan(app):
+                    yield
+            else:
+                yield
+
         @asynccontextmanager
         async def merged_lifespan(app):
             async with mcp_app.lifespan(mcp_app):
-                if tenant_backend is not None:
-                    await _load_tenant_variants(tenant_backend, self._skills)
-                    await _restore_sandbox_connections(tenant_backend)
-                if user_lifespan is not None:
-                    async with user_lifespan(app):
-                        yield
+                if self._admin_mcp_app is not None:
+                    async with self._admin_mcp_app.lifespan(self._admin_mcp_app):
+                        async with _inner_lifespan(app):
+                            yield
                 else:
-                    yield
+                    async with _inner_lifespan(app):
+                        yield
 
         super().__init__(lifespan=merged_lifespan, **fastapi_kwargs)
 
@@ -72,6 +89,13 @@ class HarnessAPI(FastAPI):
         if tenant_backend is not None:
             from .multitenancy.router import build_tenant_router
             self.include_router(build_tenant_router(tenant_backend, self._skills))
+
+        # Mount admin MCP server (opt-in, only when tenant_backend is set)
+        if self._enable_admin_mcp:
+            from .multitenancy.admin_mcp import build_admin_mcp_server
+            admin_mcp = build_admin_mcp_server(tenant_backend, self._skills)
+            self._admin_mcp_app = admin_mcp.http_app(path="/")
+            self.mount(admin_mcp_path, self._admin_mcp_app)
 
         # Mount FastMCP ASGI app
         self.mount(mcp_path, mcp_app)
@@ -132,13 +156,20 @@ async def _load_tenant_variants(tenant_backend: TenantBackend, base_skills: dict
 
 
 async def _restore_sandbox_connections(tenant_backend: TenantBackend) -> None:
-    """Restore sandbox connections from storage into the in-memory SandboxRegistry."""
+    """Restore sandbox connections from storage, dropping any that are unreachable.
+
+    Sandboxes (especially local_subprocess) do not survive server restarts.
+    Registering a stale connection would cause 502 errors on every tenant request
+    until the operator manually re-provisions. We health-check each connection and
+    only register it if the sandbox is still reachable.
+    """
     if tenant_backend.sandbox_registry is None:
         return
     if not hasattr(tenant_backend.storage, "load_sandboxes"):
         return
-    from datetime import datetime, timezone
+    from datetime import datetime
     from .multitenancy.sandbox_registry import SandboxConnection
+    from .multitenancy.sandbox_client import sandbox_client
 
     rows = await tenant_backend.storage.load_sandboxes()
     for row in rows:
@@ -152,4 +183,8 @@ async def _restore_sandbox_connections(tenant_backend: TenantBackend) -> None:
             created_at=datetime.fromisoformat(row["created_at"]),
             last_seen=datetime.fromisoformat(row["last_seen"]) if row.get("last_seen") else None,
         )
-        tenant_backend.sandbox_registry.register(conn)
+        if await sandbox_client.health_check(conn):
+            tenant_backend.sandbox_registry.register(conn)
+        elif hasattr(tenant_backend.storage, "delete_sandbox"):
+            # Remove the stale record so it doesn't re-appear on the next restart
+            await tenant_backend.storage.delete_sandbox(conn.tenant_id)

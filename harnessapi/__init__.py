@@ -13,6 +13,7 @@ from .exceptions import (
 )
 from .models import SkillInput, SkillOutput
 from .multitenancy import (
+    build_admin_mcp_server,
     InProcessStorageBackend,
     LocalSubprocessProvider,
     SandboxConnection,
@@ -26,6 +27,7 @@ from .skill import Skill, SkillMeta
 
 __all__ = [
     "HarnessAPI",
+    "build_admin_mcp_server",
     "Skill",
     "SkillMeta",
     "SkillInput",

@@ -43,8 +43,12 @@ class TenantBackend:
     sandbox_registry: SandboxRegistry | None = None
     sandbox_provider: str | SandboxProvider | None = None
     sandbox_provider_config: dict[str, Any] = field(default_factory=dict)
+    # Internal — constructed once from sandbox_provider + sandbox_provider_config
+    _provider_cache: SandboxProvider | None = field(default=None, init=False, repr=False, compare=False)
 
     def get_sandbox_provider(self) -> SandboxProvider | None:
-        """Resolve sandbox_provider string or instance to a SandboxProvider."""
-        from .sandbox_providers import get_provider
-        return get_provider(self.sandbox_provider, self.sandbox_provider_config)
+        """Return the cached SandboxProvider, constructing it once on first call."""
+        if self._provider_cache is None and self.sandbox_provider is not None:
+            from .sandbox_providers import get_provider
+            self._provider_cache = get_provider(self.sandbox_provider, self.sandbox_provider_config)
+        return self._provider_cache
