@@ -3,12 +3,14 @@ from __future__ import annotations
 
 import ast
 import importlib
+import importlib.resources
 import importlib.util
+import shutil
 import sys
 from pathlib import Path
 
 # ---------------------------------------------------------------------------
-# Scaffolded file templates
+# Scaffolded file templates (default init)
 # ---------------------------------------------------------------------------
 
 _SKILL_MD = '''\
@@ -489,6 +491,64 @@ def _find_harness_attr(path: Path, module_name: str) -> str | None:
 
 
 # ---------------------------------------------------------------------------
+# examples command — scaffold bundled example projects
+# ---------------------------------------------------------------------------
+
+_EXAMPLES = {
+    "agentic-rag": "Per-tenant document ingestion and semantic search (ChromaDB + GPT-4o)",
+}
+
+
+def _scaffold_example(name: str, target_dir: Path) -> None:
+    if target_dir.exists():
+        print(f"Error: '{target_dir}' already exists.")
+        sys.exit(1)
+
+    pkg = importlib.resources.files("harnessapi") / "examples" / name
+    # importlib.resources.as_file gives a real filesystem path even from a zip wheel
+    with importlib.resources.as_file(pkg) as src:
+        shutil.copytree(src, target_dir)
+
+    # Print each file so the output matches `init` UX
+    for f in sorted(target_dir.rglob("*")):
+        if f.is_file():
+            print(f"  created  {f.relative_to(target_dir.parent)}")
+
+    print(f"""
+Done! Next steps:
+
+  cd {target_dir.name}
+  cp .env.example .env        # add your OPENAI_API_KEY
+  uv sync
+  harnessapi run
+
+Then call your first skill:
+
+  curl -X POST http://localhost:8000/skills/ingest \\
+    -H "Content-Type: application/json" \\
+    -H "Accept: application/json" \\
+    -H "X-Tenant-ID: tenant-1" \\
+    -d '{{"text": "Apollo 11 landed on the Moon on July 20, 1969.", "doc_id": "apollo"}}'
+
+  curl -X POST http://localhost:8000/skills/search \\
+    -H "Content-Type: application/json" \\
+    -H "Accept: application/json" \\
+    -H "X-Tenant-ID: tenant-1" \\
+    -d '{{"query": "When did Apollo 11 land?"}}'
+
+MCP server:   http://localhost:8000/mcp
+Admin MCP:    http://localhost:8000/admin-mcp  (X-Admin-Key: dev-secret)
+OpenAPI docs: http://localhost:8000/docs
+""".strip())
+
+
+_EXAMPLE_SCAFFOLD = {
+    "agentic-rag": lambda target_dir: _scaffold_example("agentic-rag", target_dir),
+}
+
+
+
+# ---------------------------------------------------------------------------
 # Entry point
 # ---------------------------------------------------------------------------
 
@@ -500,6 +560,8 @@ Commands:
   init --skill <path>                    Add API layer to an existing agentskills.io skill
   init --skills-dir <dir>                Add API layer to all skills in a directory
   init --function <file.py> [--output]   Wrap a Python function as a skill
+  examples                               List available example projects
+  examples <name> [dir]                  Scaffold an example project locally
   run                                    Start the development server
 
 Options (run):
@@ -513,6 +575,9 @@ Examples:
   harnessapi init --skill .agents/skills/summarize
   harnessapi init --skills-dir .agents/skills
   harnessapi init --function utils/compute.py --output skills
+  harnessapi examples
+  harnessapi examples agentic-rag
+  harnessapi examples agentic-rag my-rag-project
   harnessapi run
   harnessapi run --port 8080 --host 0.0.0.0
 """
@@ -546,6 +611,22 @@ def main() -> None:
             init_function(opts.function, opts.output)
         else:
             init_project(opts.project_name)
+
+    elif command == "examples":
+        if not rest:
+            print("Available examples:\n")
+            for name, desc in _EXAMPLES.items():
+                print(f"  {name:<20} {desc}")
+            print(f"\nUsage: harnessapi examples <name> [output-dir]")
+        else:
+            example_name = rest[0]
+            if example_name not in _EXAMPLE_SCAFFOLD:
+                print(f"Unknown example: '{example_name}'")
+                print(f"Available: {', '.join(_EXAMPLES)}")
+                sys.exit(1)
+            target_name = rest[1] if len(rest) > 1 else example_name
+            target_dir = Path.cwd() / target_name
+            _EXAMPLE_SCAFFOLD[example_name](target_dir)
 
     elif command == "run":
         run(rest)

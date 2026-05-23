@@ -1,0 +1,5 @@
+[skill]
+description  = "List all documents indexed in the tenant's vector store, with chunk counts and metadata."
+is_mcp       = true
+tags         = ["rag", "admin"]
+timeout_secs = 30
