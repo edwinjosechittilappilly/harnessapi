@@ -1,10 +1,12 @@
 """Tests for streaming helpers and SSE generator."""
 import asyncio
 import pytest
+
+pytestmark = pytest.mark.unit
+
 from harnessapi.streaming import skill_sse_generator
 from harnessapi.skill import Skill, SkillMeta
 from harnessapi.models import SkillInput, SkillOutput
-from pydantic import BaseModel
 
 
 class _Input(SkillInput):
@@ -33,8 +35,6 @@ async def _collect(skill, input_obj):
     return events
 
 
-# ── Non-streaming ─────────────────────────────────────────────────────────
-
 async def test_non_streaming_emits_result_then_done():
     async def handler(input: _Input) -> _Output:
         return _Output(result=input.text.upper())
@@ -45,8 +45,6 @@ async def test_non_streaming_emits_result_then_done():
     assert event_types == ["result", "done"]
     assert "HELLO" in events[0][1]
 
-
-# ── Streaming ─────────────────────────────────────────────────────────────
 
 async def test_streaming_emits_chunks_then_done():
     async def handler(input: _Input):
@@ -59,8 +57,6 @@ async def test_streaming_emits_chunks_then_done():
     assert event_types == ["chunk", "chunk", "chunk", "done"]
     assert [e[1] for e in events[:3]] == ["a", "b", "c"]
 
-
-# ── Error handling ────────────────────────────────────────────────────────
 
 async def test_handler_exception_emits_error():
     async def handler(input: _Input) -> _Output:

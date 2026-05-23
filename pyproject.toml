@@ -76,12 +76,13 @@ harnessapi = "harnessapi.cli:main"
 [tool.hatch.build.targets.wheel]
 packages = ["harnessapi"]
 
-[tool.hatch.build.targets.wheel.force-include]
-"harnessapi/examples" = "harnessapi/examples"
-
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
-testpaths = ["tests"]
+testpaths = ["tests/unit", "tests/integration"]
+markers = [
+    "unit: fast isolated tests with no external I/O",
+    "integration: tests that spin up HTTP servers, subprocesses, or storage backends",
+]
 
 [tool.ruff]
 line-length = 100

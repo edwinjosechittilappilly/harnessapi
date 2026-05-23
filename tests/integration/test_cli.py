@@ -1,6 +1,9 @@
 """Tests for harnessapi CLI — init modes and run command."""
 import subprocess
 import sys
+import pytest
+
+pytestmark = pytest.mark.integration
 import textwrap
 from pathlib import Path
 
