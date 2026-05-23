@@ -1,11 +1,15 @@
 """Tests for SkillsDirectoryProvider and SKILL.md parsing."""
 import warnings
 from pathlib import Path
+
 import pytest
+
+pytestmark = pytest.mark.unit
+
 from harnessapi.discovery import SkillsDirectoryProvider
 from harnessapi.skillcompat import parse_skill_md
 
-SKILLS_DIR = Path(__file__).parent / "skills"
+SKILLS_DIR = Path(__file__).parent.parent / "skills"
 
 
 def test_discovers_valid_skills():
@@ -48,10 +52,9 @@ def test_skill_md_fields_loaded(skills_dir):
 
 
 def test_toml_overrides_skill_md(skills_dir):
-    # skill.toml description wins over SKILL.md description
     skills = {s.meta.name: s for s in SkillsDirectoryProvider(skills_dir).discover()}
     greet = skills["greet"]
-    assert greet.meta.description == "Greet someone by name"  # from toml, not SKILL.md
+    assert greet.meta.description == "Greet someone by name"
 
 
 def test_defaults_and_examples_loaded(skills_dir):
@@ -67,8 +70,6 @@ def test_streaming_handler_detected(skills_dir):
     assert skills["echo_stream"].is_streaming_handler() is True
     assert skills["greet"].is_streaming_handler() is False
 
-
-# ── skillcompat ────────────────────────────────────────────────────────────
 
 def test_parse_skill_md_frontmatter():
     skill_md = SKILLS_DIR / "greet" / "SKILL.md"

@@ -182,4 +182,3 @@ cython_debug/
 /.agents
 skills-lock.json
 /test-run-app
-/tests/skills

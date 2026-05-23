@@ -1,6 +1,8 @@
 """Tests for HarnessAPI app — HTTP endpoints, JSON and SSE."""
 import pytest
 
+pytestmark = pytest.mark.integration
+
 
 def test_registered_skills(app):
     assert "greet" in app.skills

@@ -1,6 +1,8 @@
 """Tests for MCP tool registration."""
 import pytest
 from harnessapi.mcp import build_mcp_server, register_skill_as_mcp_tool
+
+pytestmark = pytest.mark.integration
 from harnessapi.skill import Skill, SkillMeta
 from harnessapi.models import SkillInput, SkillOutput
 
