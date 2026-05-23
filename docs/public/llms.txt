@@ -1,10 +1,12 @@
 # harnessapi
 
-> Python framework that turns a skill folder into a streaming HTTP API and an MCP tool — simultaneously, with no routes, no decorators, and no separate server to maintain.
+> Skill-first Python framework that turns a skill folder into a streaming HTTP API and an MCP tool — simultaneously, with no routes, no decorators, and no separate server to maintain.
 
-harnessapi is a Python framework (MIT license, Python 3.11+) built on FastAPI and FastMCP. You write a skill folder with two required files (models.py for Pydantic I/O, handler.py for async logic) and optionally a skill.toml for metadata. harnessapi discovers it at startup and registers it as a POST /skills/{name} HTTP endpoint, an MCP tool at /mcp, and an entry in the Swagger UI at /docs — all three simultaneously.
+harnessapi is a Python framework (MIT license, Python 3.11+) built on FastAPI and FastMCP. Write a skill folder with two required files (models.py for Pydantic I/O, handler.py for async logic) and optionally a skill.toml for metadata. harnessapi discovers it at startup and registers it as a POST /skills/{name} HTTP endpoint, an MCP tool at /mcp, and an entry in the Swagger UI at /docs — all three simultaneously.
 
 Streaming is built in: use `return` for a single response, `yield` for Server-Sent Events (SSE). Clients that send `Accept: application/json` receive a collected JSON response from the same handler with no code changes.
+
+Multi-tenancy is built in: add a TenantBackend and every skill gets per-user variants — same input/output schema, different handler implementation, isolated routing. Variants move through sandbox → preview → promoted status. Per-user sandboxes (local subprocess, Docker, Kubernetes) provide process isolation for untrusted code.
 
 - PyPI: https://pypi.org/project/harnessapi/
 - GitHub: https://github.com/edwinjosechittilappilly/harnessapi
@@ -12,16 +14,23 @@ Streaming is built in: use `return` for a single response, `yield` for Server-Se
 
 ## Docs
 
-- [Introduction](https://edwinjosechittilappilly.github.io/harnessapi/): What harnessapi is, core idea, when to use it.
+- [Introduction](https://edwinjosechittilappilly.github.io/harnessapi/introduction/): Vision, mission, design principles, and how harnessapi relates to FastAPI and FastMCP.
 - [Quick start](https://edwinjosechittilappilly.github.io/harnessapi/guides/quickstart/): Get a streaming API and MCP tool running in 60 seconds.
-- [Installation](https://edwinjosechittilappilly.github.io/harnessapi/guides/installation/): Install with uv, pip, or try instantly with uvx.
-- [Skill folders](https://edwinjosechittilappilly.github.io/harnessapi/concepts/skill-folders/): Full folder structure — handler.py, models.py, skill.toml, SKILL.md, defaults/, examples/.
-- [Streaming (SSE)](https://edwinjosechittilappilly.github.io/harnessapi/concepts/streaming/): return vs yield, SSE event format, JSON mode via Accept header.
-- [MCP tools](https://edwinjosechittilappilly.github.io/harnessapi/concepts/mcp/): How skills auto-register as MCP tools; connecting to Claude Desktop, Cursor, Copilot.
+- [Installation](https://edwinjosechittilappilly.github.io/harnessapi/guides/installation/): Install with uv, pip, or try instantly with uvx. Optional extras for Docker/Kubernetes sandbox providers.
+- [Skill folders](https://edwinjosechittilappilly.github.io/harnessapi/concepts/skill-folders/): Full folder structure — handler.py, models.py, skill.toml, SKILL.md, defaults/, examples/. Discovery lifecycle, naming, multi-file handlers, input validation.
+- [Streaming (SSE)](https://edwinjosechittilappilly.github.io/harnessapi/concepts/streaming/): return vs yield, SSE event format, JSON mode via Accept header. Python and JavaScript client examples, error handling, timeouts.
+- [MCP tools](https://edwinjosechittilappilly.github.io/harnessapi/concepts/mcp/): How skills auto-register as MCP tools. Connecting to Claude Desktop, Claude Code, Cursor, Copilot. Tool naming, MCP and multi-tenancy.
 - [Example: Factorial (streaming)](https://edwinjosechittilappilly.github.io/harnessapi/examples/factorial/): Streaming factorial step-by-step with SSE and MCP.
 - [Example: Summarizer (LLM)](https://edwinjosechittilappilly.github.io/harnessapi/examples/summarizer/): LLM summarization as a streaming skill and MCP tool.
 - [Example: Web scraper](https://edwinjosechittilappilly.github.io/harnessapi/examples/web-scraper/): Streaming web scraping with harnessapi.
 - [Example: Image captioner](https://edwinjosechittilappilly.github.io/harnessapi/examples/image-captioner/): Vision LLM skill streaming image captions.
+- [Multi-tenancy overview](https://edwinjosechittilappilly.github.io/harnessapi/multi-tenancy/): How per-tenant routing works (4-step resolution: sandbox → preview → promoted → base). Drop-in setup, tenant extraction, core invariants.
+- [Variant lifecycle](https://edwinjosechittilappilly.github.io/harnessapi/multi-tenancy/variants/): Clone → customize → test → preview → promote workflow. Variant statuses, AST validation, auto-promote, demoting and deleting.
+- [Preview & staging](https://edwinjosechittilappilly.github.io/harnessapi/multi-tenancy/preview/): Preview status — route real tenant traffic without hard-promoting. Coexistence with promoted variant, displacement rule, stopping a preview.
+- [Per-user sandboxes](https://edwinjosechittilappilly.github.io/harnessapi/multi-tenancy/sandboxes/): Process-isolated sandbox per tenant. Provision, push, call, health check, teardown. Providers: local_subprocess, docker, kubernetes. Custom SandboxProvider protocol.
+- [Storage backends](https://edwinjosechittilappilly.github.io/harnessapi/multi-tenancy/storage/): InProcessStorageBackend, LocalFileStorageBackend, SQLiteStorageBackend, custom protocol. Startup restore behavior.
+- [Admin MCP server](https://edwinjosechittilappilly.github.io/harnessapi/multi-tenancy/admin-mcp/): Expose management API as 12 MCP tools at /admin-mcp. Agent workflow. Protecting /admin-mcp with admin_mcp_auth.
+- [Multi-tenancy API reference](https://edwinjosechittilappilly.github.io/harnessapi/multi-tenancy/api-reference/): All management endpoints (variant lifecycle, introspection, sandbox lifecycle). TenantBackend and HarnessAPI configuration params.
 - [Convert an agentskills.io skill](https://edwinjosechittilappilly.github.io/harnessapi/guides/convert-skill/): Drop-in compatibility with existing agentskills.io skill folders.
 - [Connect to Claude Desktop](https://edwinjosechittilappilly.github.io/harnessapi/guides/claude-desktop/): Add harnessapi as an MCP server in Claude Desktop and Cursor.
 - [Deploy to production](https://edwinjosechittilappilly.github.io/harnessapi/guides/deploy/): Deploy to Railway, Fly.io, Docker, or any ASGI host.
