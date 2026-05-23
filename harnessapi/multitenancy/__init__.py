@@ -1,5 +1,6 @@
 from .admin_mcp import build_admin_mcp_server
 from .backend import TenantBackend
+from .ops import VariantOpsError
 from .models import SkillVariant, VariantResponse, VariantSummary
 from .registry import TenantSkillRegistry
 from .sandbox_registry import SandboxConnection, SandboxRegistry
@@ -11,6 +12,7 @@ from .sandbox_providers.local import LocalSubprocessProvider
 __all__ = [
     "build_admin_mcp_server",
     "TenantBackend",
+    "VariantOpsError",
     "SkillVariant",
     "VariantResponse",
     "VariantSummary",

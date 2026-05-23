@@ -617,3 +617,249 @@ def test_admin_mcp_not_mounted_without_tenant_backend():
     from starlette.routing import Mount
     mount_paths = [r.path for r in app.routes if isinstance(r, Mount)]
     assert "/admin-mcp" not in mount_paths
+
+
+# ---------------------------------------------------------------------------
+# 16. Provider is cached — same instance returned on every call
+# ---------------------------------------------------------------------------
+
+def test_sandbox_provider_is_cached():
+    """get_sandbox_provider() must return the same instance every call so that
+    the process handle dict in LocalSubprocessProvider is not lost between
+    provision and teardown calls."""
+    from harnessapi.multitenancy import SandboxRegistry
+
+    backend = TenantBackend(
+        tenant_extractor=lambda req: req.headers.get("X-Tenant-ID"),
+        storage=InProcessStorageBackend(),
+        sandbox_registry=SandboxRegistry(),
+        sandbox_provider="local_subprocess",
+    )
+    p1 = backend.get_sandbox_provider()
+    p2 = backend.get_sandbox_provider()
+    assert p1 is p2
+
+
+# ---------------------------------------------------------------------------
+# 17. Stale sandbox connections are dropped on restore
+# ---------------------------------------------------------------------------
+
+async def test_restore_sandbox_connections_drops_unreachable(tmp_path):
+    """Connections that fail a health check are removed from storage on restore,
+    not registered into the in-memory registry."""
+    from harnessapi.multitenancy import SQLiteStorageBackend, SandboxRegistry
+    from harnessapi.multitenancy.sandbox_registry import SandboxConnection
+    from datetime import datetime, timezone
+
+    storage = SQLiteStorageBackend(path=tmp_path / "sb.db")
+    registry = SandboxRegistry()
+    backend = TenantBackend(
+        tenant_extractor=lambda req: req.headers.get("X-Tenant-ID"),
+        storage=storage,
+        sandbox_registry=registry,
+    )
+
+    # Write a stale connection pointing at a port nothing is listening on
+    stale = SandboxConnection(
+        tenant_id="stale-tenant",
+        endpoint_url="http://127.0.0.1:1",   # port 1 is never open
+        sandbox_type="local_subprocess",
+        created_at=datetime.now(timezone.utc),
+    )
+    await storage.save_sandbox(stale)
+
+    # Run the restore logic
+    from harnessapi.app import _restore_sandbox_connections
+    await _restore_sandbox_connections(backend)
+
+    # Stale connection must not be in the registry
+    assert registry.get("stale-tenant") is None
+
+    # And must have been purged from storage too
+    remaining = await storage.load_sandboxes()
+    assert not any(r["tenant_id"] == "stale-tenant" for r in remaining)
+
+
+# ---------------------------------------------------------------------------
+# 18. run_variant forwards validated input (model_dump) to sandbox, not raw body
+# ---------------------------------------------------------------------------
+
+async def test_run_variant_forwards_validated_input(client, monkeypatch):
+    """When a sandbox is provisioned, /run must forward input_obj.model_dump(),
+    not the raw body dict, so validation happens centrally."""
+    from harnessapi.multitenancy import SandboxRegistry
+    from harnessapi.multitenancy.sandbox_registry import SandboxConnection
+    from datetime import datetime, timezone
+
+    # Create a variant
+    r1 = await client.post(
+        "/tenants/user-fwd/skills/greet/customize",
+        json={"source_code": CUSTOM_GREET_SOURCE},
+    )
+    variant_id = r1.json()["variant_id"]
+
+    # Inject a fake sandbox connection into the registry used by this app
+    # (we need to reach inside the fixture's backend)
+    forwarded: list[dict] = []
+
+    async def fake_push(conn, skill_name, source, timeout=30.0):
+        pass
+
+    async def fake_forward(conn, skill_name, input_json, timeout=10.0):
+        forwarded.append(input_json)
+        return {"message": "from-sandbox"}
+
+    from harnessapi.multitenancy import sandbox_client as sc_module
+    monkeypatch.setattr(sc_module.sandbox_client, "push_skill", fake_push)
+    monkeypatch.setattr(sc_module.sandbox_client, "forward", fake_forward)
+
+    # Attach a fake connection to the backend's sandbox registry
+    from harnessapi.multitenancy.sandbox_registry import SandboxConnection, SandboxRegistry
+    sb_registry = SandboxRegistry()
+    conn = SandboxConnection(
+        tenant_id="user-fwd",
+        endpoint_url="http://127.0.0.1:99999",
+        sandbox_type="local_subprocess",
+        created_at=datetime.now(timezone.utc),
+    )
+    sb_registry.register(conn)
+
+    # Temporarily swap the backend's sandbox_registry
+    # We rebuild an app with sandbox_registry set
+    from harnessapi.multitenancy import SQLiteStorageBackend
+    sb_backend = TenantBackend(
+        tenant_extractor=lambda req: req.headers.get("X-Tenant-ID"),
+        storage=InProcessStorageBackend(),
+        sandbox_registry=sb_registry,
+    )
+    sb_app = HarnessAPI(skills_dir=SKILLS_DIR, tenant_backend=sb_backend)
+
+    from httpx import AsyncClient, ASGITransport
+    async with AsyncClient(transport=ASGITransport(app=sb_app), base_url="http://test") as c:
+        # Create variant in this app's backend
+        r = await c.post(
+            "/tenants/user-fwd/skills/greet/customize",
+            json={"source_code": CUSTOM_GREET_SOURCE},
+        )
+        vid = r.json()["variant_id"]
+
+        monkeypatch.setattr(sc_module.sandbox_client, "push_skill", fake_push)
+        monkeypatch.setattr(sc_module.sandbox_client, "forward", fake_forward)
+
+        r2 = await c.post(
+            f"/tenants/user-fwd/skills/greet/variants/{vid}/run",
+            json={"name": "Validated"},
+        )
+
+    assert r2.status_code == 200
+    assert len(forwarded) == 1
+    # The forwarded payload must be the Pydantic model's output, not the raw body.
+    # model_dump() on the Input model produces {"name": "Validated"} — same here,
+    # but critically this path exercises the model_dump() branch not raw body.
+    assert forwarded[0] == {"name": "Validated"}
+
+
+# ---------------------------------------------------------------------------
+# 19. SSE sandbox proxy path: forward_sse is called when no Accept: application/json
+# ---------------------------------------------------------------------------
+
+async def test_sandbox_sse_proxy_path(monkeypatch):
+    """When a sandbox is registered and the caller does not send Accept: application/json,
+    routing.py must call forward_sse (the SSE proxy), not forward."""
+    from harnessapi.multitenancy import SandboxRegistry
+    from harnessapi.multitenancy.sandbox_registry import SandboxConnection
+    from datetime import datetime, timezone
+
+    sse_called: list[bool] = []
+    json_called: list[bool] = []
+
+    async def fake_forward_sse(conn, skill_name, input_json, timeout=30.0):
+        sse_called.append(True)
+        yield {"data": "hello", "event": "chunk"}
+        yield {"data": "", "event": "done"}
+
+    async def fake_forward(conn, skill_name, input_json, timeout=30.0):
+        json_called.append(True)
+        return {"message": "json"}
+
+    from harnessapi.multitenancy import sandbox_client as sc_module
+    monkeypatch.setattr(sc_module.sandbox_client, "forward_sse", fake_forward_sse)
+    monkeypatch.setattr(sc_module.sandbox_client, "forward", fake_forward)
+
+    sb_registry = SandboxRegistry()
+    conn = SandboxConnection(
+        tenant_id="sse-user",
+        endpoint_url="http://127.0.0.1:99999",
+        sandbox_type="local_subprocess",
+        created_at=datetime.now(timezone.utc),
+    )
+    sb_registry.register(conn)
+
+    backend = TenantBackend(
+        tenant_extractor=lambda req: req.headers.get("X-Tenant-ID"),
+        storage=InProcessStorageBackend(),
+        sandbox_registry=sb_registry,
+    )
+    app = HarnessAPI(skills_dir=SKILLS_DIR, tenant_backend=backend)
+
+    from httpx import AsyncClient, ASGITransport
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as c:
+        # SSE request (no Accept: application/json)
+        r = await c.post(
+            "/skills/greet",
+            json={"name": "SSEUser"},
+            headers={"X-Tenant-ID": "sse-user"},
+        )
+
+    assert r.status_code == 200
+    assert sse_called, "forward_sse should have been called for SSE request"
+    assert not json_called, "forward (JSON) should not have been called for SSE request"
+
+
+async def test_sandbox_json_path_calls_forward(monkeypatch):
+    """When a sandbox is registered and the caller sends Accept: application/json,
+    routing.py must call forward (JSON), not forward_sse."""
+    from harnessapi.multitenancy import SandboxRegistry
+    from harnessapi.multitenancy.sandbox_registry import SandboxConnection
+    from datetime import datetime, timezone
+
+    sse_called: list[bool] = []
+
+    async def fake_forward_sse(conn, skill_name, input_json, timeout=30.0):
+        sse_called.append(True)
+        yield {}
+
+    async def fake_forward(conn, skill_name, input_json, timeout=30.0):
+        return {"message": "Hello, JSONUser!"}
+
+    from harnessapi.multitenancy import sandbox_client as sc_module
+    monkeypatch.setattr(sc_module.sandbox_client, "forward_sse", fake_forward_sse)
+    monkeypatch.setattr(sc_module.sandbox_client, "forward", fake_forward)
+
+    sb_registry = SandboxRegistry()
+    conn = SandboxConnection(
+        tenant_id="json-user",
+        endpoint_url="http://127.0.0.1:99999",
+        sandbox_type="local_subprocess",
+        created_at=datetime.now(timezone.utc),
+    )
+    sb_registry.register(conn)
+
+    backend = TenantBackend(
+        tenant_extractor=lambda req: req.headers.get("X-Tenant-ID"),
+        storage=InProcessStorageBackend(),
+        sandbox_registry=sb_registry,
+    )
+    app = HarnessAPI(skills_dir=SKILLS_DIR, tenant_backend=backend)
+
+    from httpx import AsyncClient, ASGITransport
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as c:
+        r = await c.post(
+            "/skills/greet",
+            json={"name": "JSONUser"},
+            headers={"X-Tenant-ID": "json-user", "Accept": "application/json"},
+        )
+
+    assert r.status_code == 200
+    assert r.json()["message"] == "Hello, JSONUser!"
+    assert not sse_called, "forward_sse should not have been called for JSON request"

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import json
 from datetime import datetime, timezone
-from typing import Any, AsyncGenerator, TYPE_CHECKING
+from typing import Any, AsyncIterator, TYPE_CHECKING
 
 if TYPE_CHECKING:
     from .sandbox_registry import SandboxConnection
@@ -97,7 +97,7 @@ class SandboxClient:
         skill_name: str,
         input_json: dict[str, Any],
         timeout: float = _DEFAULT_TIMEOUT,
-    ) -> AsyncGenerator:
+    ) -> AsyncIterator[dict[str, str]]:
         """Stream SSE events from a sandbox skill back to the caller."""
         httpx = _httpx_client()
         headers = {

@@ -16,10 +16,12 @@ POST /skills/greet   (X-Tenant-ID: user-a)
          │
          ▼
    SkillRoute resolves:
-   1. Does user-a have a promoted variant?  → use variant handler
-   2. Does user-a have a sandbox?           → forward to sandbox process
+   1. Does user-a have a sandbox?           → forward to sandbox process*
+   2. Does user-a have a promoted variant?  → run variant handler in-process
    3. No variant, no sandbox               → use base skill handler
 ```
+
+*The sandbox receives whichever handler was last pushed to it via `push-to-sandbox`. Call that endpoint after promoting a variant to keep the sandbox in sync.
 
 The route table never grows. Dispatch is a single dict lookup per request.
 
@@ -163,6 +165,8 @@ backend = TenantBackend(
 ---
 
 ## Handler source constraints
+
+> **Security note:** AST validation blocks naive mistakes and obvious injection attempts. It is **not** a security boundary — determined code can bypass it (e.g. via `getattr`, `__builtins__`, or lambda tricks). True isolation requires a `SandboxProvider` (subprocess/Docker/Kubernetes). Do not rely on AST validation alone for untrusted input.
 
 Submitted handler source must pass static AST validation before it is accepted:
 
@@ -331,7 +335,7 @@ Available MCP tools:
 | `sandbox_health` | Check if a sandbox is reachable |
 | `push_to_sandbox` | Deploy promoted variant handler to the sandbox |
 
-> The admin MCP server has no authentication by default. Add auth middleware before enabling in production.
+> **Security:** The admin MCP server has no authentication by default. Every tool can execute validated code on your server and manage any tenant's variants. You must protect `/admin-mcp` with authentication middleware before enabling in production. Never expose it on a public network without auth.
 
 ---
 
