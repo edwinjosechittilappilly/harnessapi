@@ -13,6 +13,27 @@ GET  /docs               ← Swagger UI
 
 ---
 
+## Scaffold this example
+
+```bash
+# Install harnessapi if you haven't already
+uv tool install harnessapi        # recommended
+# pip install harnessapi          # alternative
+
+# List all bundled examples
+harnessapi examples
+
+# Scaffold into ./agentic-rag/
+harnessapi examples agentic-rag
+
+# Or scaffold into a custom directory
+harnessapi examples agentic-rag my-rag-project
+```
+
+Then follow the [Setup](#setup) steps below.
+
+---
+
 ## Architecture
 
 ```
