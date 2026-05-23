@@ -80,10 +80,15 @@ class SkillRoute(APIRoute):
             timeout = skill.meta.timeout_secs
 
             if tenant_registry is not None and tenant_id is not None:
-                variant = tenant_registry.get_promoted(tenant_id, skill.meta.name)
-                if variant is not None:
-                    handler = variant.handler
-                    is_streaming = variant.is_streaming_handler()
+                preview = tenant_registry.get_preview(tenant_id, skill.meta.name)
+                if preview is not None:
+                    handler = preview.handler
+                    is_streaming = preview.is_streaming_handler()
+                else:
+                    variant = tenant_registry.get_promoted(tenant_id, skill.meta.name)
+                    if variant is not None:
+                        handler = variant.handler
+                        is_streaming = variant.is_streaming_handler()
 
             try:
                 input_obj = skill.input_model.model_validate(body)

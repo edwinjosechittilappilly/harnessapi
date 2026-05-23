@@ -9,7 +9,7 @@ from fastapi.responses import JSONResponse
 from pydantic import ValidationError
 
 from .models import VariantSummary
-from .ops import VariantOpsError, op_clone, op_customize, op_demote, op_promote
+from .ops import VariantOpsError, op_clone, op_customize, op_demote, op_preview, op_promote
 
 if TYPE_CHECKING:
     from ..skill import Skill
@@ -74,6 +74,18 @@ def build_tenant_router(backend: TenantBackend, base_skills: dict[str, Skill]) -
     async def demote_variant(tenant_id: str, skill_name: str, variant_id: str):
         try:
             resp = await op_demote(backend, base_skills, tenant_id, skill_name, variant_id)
+        except VariantOpsError as exc:
+            raise _ops_error_to_http(exc)
+        return JSONResponse(content=resp.model_dump())
+
+    # ------------------------------------------------------------------
+    # Preview
+    # ------------------------------------------------------------------
+
+    @router.post("/{tenant_id}/skills/{skill_name}/variants/{variant_id}/preview")
+    async def preview_variant(tenant_id: str, skill_name: str, variant_id: str):
+        try:
+            resp = await op_preview(backend, base_skills, tenant_id, skill_name, variant_id)
         except VariantOpsError as exc:
             raise _ops_error_to_http(exc)
         return JSONResponse(content=resp.model_dump())

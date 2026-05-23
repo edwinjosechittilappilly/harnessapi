@@ -44,7 +44,12 @@ class SandboxClient:
         handler_source: str,
         timeout: float = _DEFAULT_TIMEOUT,
     ) -> None:
-        """Push handler source to the sandbox via its EditRoute endpoint."""
+        """Push handler source to the sandbox via its EditRoute endpoint.
+
+        Skips the HTTP round-trip when the source hasn't changed since the last push.
+        """
+        if conn.last_pushed_source.get(skill_name) == handler_source:
+            return
         httpx = _httpx_client()
         headers = {"Content-Type": "application/json"}
         if conn.auth_token:
@@ -61,6 +66,7 @@ class SandboxClient:
                 f"push_skill failed for {skill_name!r} at {conn.endpoint_url}: "
                 f"HTTP {resp.status_code} — {resp.text[:200]}"
             )
+        conn.last_pushed_source[skill_name] = handler_source
 
     async def forward(
         self,

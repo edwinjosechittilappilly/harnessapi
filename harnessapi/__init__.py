@@ -15,6 +15,7 @@ from .models import SkillInput, SkillOutput
 from .multitenancy import (
     build_admin_mcp_server,
     InProcessStorageBackend,
+    LocalFileStorageBackend,
     LocalSubprocessProvider,
     SandboxConnection,
     SandboxRegistry,
@@ -45,6 +46,7 @@ __all__ = [
     "TenantBackend",
     "SkillVariant",
     "InProcessStorageBackend",
+    "LocalFileStorageBackend",
     "SQLiteStorageBackend",
     "SandboxRegistry",
     "SandboxConnection",

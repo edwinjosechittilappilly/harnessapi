@@ -15,6 +15,7 @@ class SandboxConnection:
     metadata: dict[str, Any] = field(default_factory=dict)
     created_at: datetime = field(default_factory=lambda: __import__("datetime").datetime.now(__import__("datetime").timezone.utc))
     last_seen: datetime | None = None
+    last_pushed_source: dict[str, str] = field(default_factory=dict)  # skill_name → source (in-memory only)
 
 
 class SandboxRegistry:
