@@ -4,7 +4,7 @@ version = "0.1.0"
 description = "Agentic RAG example using harnessapi with per-tenant document isolation"
 requires-python = ">=3.11"
 dependencies = [
-    "harnessapi>=0.1.5",
+    "harnessapi>=0.1.9",
     "chromadb>=0.5.0",
     "sentence-transformers>=3.0.0",
     "openai>=1.30.0",

@@ -1,10 +1,12 @@
+from __future__ import annotations
+
 import os
 import chromadb
 
-_client: chromadb.PersistentClient | None = None
+_client = None
 
 
-def _get_client() -> chromadb.PersistentClient:
+def _get_client():
     global _client
     if _client is None:
         path = os.environ.get("CHROMA_PATH", "./chroma_data")
@@ -12,7 +14,7 @@ def _get_client() -> chromadb.PersistentClient:
     return _client
 
 
-def get_collection(tenant_id: str) -> chromadb.Collection:
+def get_collection(tenant_id: str):
     return _get_client().get_or_create_collection(
         name=f"rag_{tenant_id}",
         metadata={"hnsw:space": "cosine"},

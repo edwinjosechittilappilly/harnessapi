@@ -5,6 +5,7 @@ import ast
 import importlib
 import importlib.resources
 import importlib.util
+import os
 import shutil
 import sys
 from pathlib import Path
@@ -427,6 +428,20 @@ MCP tool:       {skill_name}
 # Run command
 # ---------------------------------------------------------------------------
 
+def _project_python() -> str:
+    """Return the venv Python for the current project if one exists, else sys.executable."""
+    cwd = Path.cwd()
+    for candidate in (
+        cwd / ".venv" / "bin" / "python",
+        cwd / "venv" / "bin" / "python",
+        cwd / ".venv" / "Scripts" / "python.exe",   # Windows
+        cwd / "venv" / "Scripts" / "python.exe",
+    ):
+        if candidate.exists():
+            return str(candidate)
+    return sys.executable
+
+
 def run(args: list[str]) -> None:
     import argparse
     parser = argparse.ArgumentParser(
@@ -445,12 +460,6 @@ def run(args: list[str]) -> None:
         print("       or pass --app module:attribute explicitly.")
         sys.exit(1)
 
-    try:
-        import uvicorn
-    except ImportError:
-        print("Error: uvicorn is not installed. Run: uv add uvicorn")
-        sys.exit(1)
-
     reload = not opts.no_reload
     print(f"Starting harnessapi  →  http://{opts.host}:{opts.port}")
     print(f"  app:     {app_str}")
@@ -459,7 +468,22 @@ def run(args: list[str]) -> None:
     print(f"  mcp:     http://{opts.host}:{opts.port}/mcp")
     print()
 
-    uvicorn.run(app_str, host=opts.host, port=opts.port, reload=reload)
+    python = _project_python()
+    if python != sys.executable:
+        # Re-exec under the project venv so project dependencies are available.
+        os.execv(python, [
+            python, "-m", "uvicorn", app_str,
+            "--host", opts.host,
+            "--port", str(opts.port),
+            *([] if not reload else ["--reload"]),
+        ])
+    else:
+        try:
+            import uvicorn
+        except ImportError:
+            print("Error: uvicorn is not installed. Run: uv add uvicorn")
+            sys.exit(1)
+        uvicorn.run(app_str, host=opts.host, port=opts.port, reload=reload)
 
 
 def _detect_app() -> str | None:
