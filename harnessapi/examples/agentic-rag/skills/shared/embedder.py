@@ -1,6 +1,8 @@
+from __future__ import annotations
+
 from sentence_transformers import SentenceTransformer
 
-_model: SentenceTransformer | None = None
+_model = None
 
 
 def get_embedder() -> SentenceTransformer:

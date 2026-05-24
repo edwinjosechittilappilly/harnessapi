@@ -1,6 +1,10 @@
-from ..shared.context import tenant_id_var
-from ..shared.store import get_collection
-from ..shared.embedder import embed
+import sys
+from pathlib import Path
+sys.path.insert(0, str(Path(__file__).parent.parent))
+
+from shared.context import tenant_id_var
+from shared.store import get_collection
+from shared.embedder import embed
 from .models import Input
 
 
