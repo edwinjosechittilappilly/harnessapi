@@ -1,9 +1,9 @@
 from __future__ import annotations
 
 import inspect
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Annotated
 
-from fastapi import Request
+from fastapi import Body, Request
 from fastapi.responses import JSONResponse
 from fastapi.routing import APIRoute
 from pydantic import ValidationError
@@ -45,9 +45,10 @@ class SkillRoute(APIRoute):
         skill = self._skill
         tenant_registry = self._tenant_registry
         sandbox_registry = self._sandbox_registry
+        input_model = skill.input_model
 
-        async def endpoint(request: Request):
-            body = await request.json()
+        async def endpoint(request: Request, body=None):
+            body = body.model_dump()
             tenant_id = getattr(request.state, "tenant_id", None)
 
             # Resolution order:
@@ -115,6 +116,9 @@ class SkillRoute(APIRoute):
             return make_sse_response(skill, input_obj)
 
         endpoint.__name__ = f"skill_{skill.meta.name}"
+        # Patch the annotation so FastAPI sees the concrete model class and
+        # generates the correct OpenAPI schema with all input fields.
+        endpoint.__annotations__["body"] = Annotated[input_model, Body()]
         return endpoint
 
 

@@ -112,7 +112,7 @@ async def test_mcp_streaming_tool_call():
     assert result is not None
 
 
-# ── App-level MCP ─────────────────────────────────────────────────────────────
+# ── App-level MCP (internal) ──────────────────────────────────────────────────
 
 async def test_harness_app_registers_mcp_tools(app):
     mcp = app._mcp
@@ -124,6 +124,116 @@ async def test_harness_app_registers_mcp_tools(app):
 
 
 async def test_mcp_endpoint_mounted(app):
-    # Verify the MCP sub-application is mounted at /mcp
     mount_paths = [r.path for r in app.routes]
     assert "/mcp" in mount_paths
+
+
+# ── MCP over HTTP (real integration) ─────────────────────────────────────────
+# FastMCP's streamable-HTTP transport uses the MCP session protocol:
+# initialize → notifications/initialized → tools/list, all over SSE.
+# We use FastMCP's own in-process Client to drive this properly.
+
+import contextlib
+import json as _json
+from asgi_lifespan import LifespanManager
+from httpx import AsyncClient, ASGITransport
+
+
+@contextlib.asynccontextmanager
+async def lifespan_client(app):
+    async with LifespanManager(app) as manager:
+        async with AsyncClient(
+            transport=ASGITransport(app=manager.app), base_url="http://test"
+        ) as client:
+            yield client
+
+
+async def _mcp_session(client: AsyncClient) -> list[dict]:
+    """Run initialize → notifications/initialized → tools/list and return tool list."""
+    sse_headers = {
+        "Content-Type": "application/json",
+        "Accept": "application/json, text/event-stream",
+    }
+
+    # Step 1: initialize
+    r = await client.post("/mcp/", headers=sse_headers, json={
+        "jsonrpc": "2.0", "id": 0, "method": "initialize",
+        "params": {
+            "protocolVersion": "2024-11-05",
+            "capabilities": {},
+            "clientInfo": {"name": "test-client", "version": "0.1"},
+        },
+    })
+    assert r.status_code == 200, f"initialize failed: {r.status_code} {r.text[:200]}"
+
+    # Parse session ID from SSE response
+    session_id = None
+    for line in r.text.splitlines():
+        if line.startswith("data:"):
+            data = _json.loads(line[5:].strip())
+            if data.get("id") == 0 and "result" in data:
+                # Session ID comes back in a Mcp-Session-Id header on the response
+                session_id = r.headers.get("mcp-session-id")
+
+    session_headers = {**sse_headers}
+    if session_id:
+        session_headers["mcp-session-id"] = session_id
+
+    # Step 2: notifications/initialized (no response expected)
+    await client.post("/mcp/", headers=session_headers, json={
+        "jsonrpc": "2.0", "method": "notifications/initialized",
+    })
+
+    # Step 3: tools/list
+    r2 = await client.post("/mcp/", headers=session_headers, json={
+        "jsonrpc": "2.0", "id": 1, "method": "tools/list", "params": {},
+    })
+    assert r2.status_code == 200, f"tools/list failed: {r2.status_code} {r2.text[:200]}"
+
+    tools = []
+    for line in r2.text.splitlines():
+        if line.startswith("data:"):
+            data = _json.loads(line[5:].strip())
+            if data.get("id") == 1 and "result" in data:
+                tools = data["result"].get("tools", [])
+    return tools
+
+
+async def test_mcp_http_endpoint_reachable(app):
+    """MCP /mcp/ endpoint must respond to initialize — not 404/500."""
+    async with lifespan_client(app) as client:
+        r = await client.post("/mcp/", headers={
+            "Content-Type": "application/json",
+            "Accept": "application/json, text/event-stream",
+        }, json={
+            "jsonrpc": "2.0", "id": 0, "method": "initialize",
+            "params": {
+                "protocolVersion": "2024-11-05",
+                "capabilities": {},
+                "clientInfo": {"name": "test", "version": "0.1"},
+            },
+        })
+        assert r.status_code not in (404, 500)
+
+
+async def test_mcp_lists_tools_over_http(app):
+    """tools/list over MCP HTTP session must include the skill names."""
+    async with lifespan_client(app) as client:
+        tools = await _mcp_session(client)
+        tool_names = {t["name"] for t in tools}
+        assert "greet" in tool_names
+        assert "echo_stream" in tool_names
+
+
+async def test_mcp_tool_schema_has_input_fields(app):
+    """The greet tool inputSchema must expose the `name` field over HTTP."""
+    async with lifespan_client(app) as client:
+        tools = await _mcp_session(client)
+        greet = next((t for t in tools if t["name"] == "greet"), None)
+        assert greet is not None, "greet tool not found in tools/list"
+        # FastMCP wraps the skill Input model under an "input" property
+        props = greet.get("inputSchema", {}).get("properties", {})
+        input_props = props.get("input", {}).get("properties", {})
+        assert "name" in input_props, (
+            f"Expected 'name' in greet inputSchema.input.properties, got: {props}"
+        )
