@@ -7,950 +7,3621 @@
 - Docs: https://edwinjosechittilappilly.github.io/harnessapi/
 - License: MIT
 - Requires: Python 3.11+
-
 ---
 
 ## Introduction
 
-harnessapi is a Python framework with a different starting point.
+**harnessapi** is a Python framework with a different starting point.
 
-Most frameworks start with routes. Most agent frameworks start with tool registrations. harnessapi starts with skills — self-contained capabilities with typed inputs, typed outputs, and an async handler. The HTTP endpoint, MCP tool, streaming, validation, and Swagger docs are all consequences. Not configuration.
+Most frameworks start with routes. Most agent frameworks start with tool registrations. harnessapi starts with **skills** — self-contained capabilities with typed inputs, typed outputs, and an async handler. The HTTP endpoint, MCP tool, streaming, validation, and Swagger docs are all consequences. Not configuration.
 
-Mission: Write the capability. Everything else follows.
+> Write the capability. Everything else follows.
 
-### From one folder to three live surfaces
+---
+
+## From one folder to three live surfaces
 
 Drop a folder. Run the server.
 
-    skills/summarize/
-    ├── models.py    ← Pydantic Input + Output
-    ├── handler.py   ← async handle() function
-    └── skill.toml   ← description, tags, timeout
+```
+skills/summarize/
+├── models.py    ← Pydantic Input + Output
+├── handler.py   ← async handle() function
+└── skill.toml   ← description, tags, timeout
+```
 
-    harnessapi run
+```bash
+harnessapi run
+```
 
-You get:
-- HTTP endpoint: POST /skills/summarize — SSE streaming by default
-- MCP tool: /mcp — Claude Desktop, Claude Code, Cursor, Copilot
-- Swagger UI: /docs — interactive, zero config
+| Surface | Where |
+|---|---|
+| HTTP endpoint | `POST /skills/summarize` — SSE streaming by default |
+| MCP tool | `/mcp` — Claude Desktop, Claude Code, Cursor, Copilot |
+| Swagger UI | `/docs` — interactive, zero config |
 
 No routes to register. No tool schemas to write. No MCP server to maintain separately. Add another folder — get another endpoint and tool.
 
-### The problem it solves
+---
+
+## The problem it solves
 
 Building an LLM-powered service means assembling the same scaffold every time: FastAPI routes, Pydantic models, SSE plumbing, MCP tool schema, multi-tenant routing, sandbox execution for untrusted code. Each layer is solvable alone — combining them is where the work piles up.
 
 harnessapi does the assembly. You write the handler. The framework derives the rest from the folder structure.
 
-### Design principles
+---
 
-- Skill-first: The capability is the unit. Routes and tool registrations are derived from it, not defined alongside it.
-- Zero boilerplate: No decorators, no schema files, no separate server process. If you didn't write it in the skill folder, harnessapi handles it.
-- Streaming native: SSE by default. Plain JSON with one header change. Same handler, same URL either way.
-- Agent-ready: MCP tools, hot-swap, per-user variants, sandbox execution — built in from the start, not bolted on.
-- Composable: harnessapi is a FastAPI subclass. All FastAPI middleware, routers, auth, and dependency injection work exactly as documented.
+## Design principles
 
-### Built on FastAPI and FastMCP
-
-harnessapi is not a replacement for either — it is built on both and exposes them fully.
-
-- FastAPI handles HTTP routing, request validation, and the OpenAPI schema. Every harnessapi app is a FastAPI app.
-- FastMCP handles the MCP server. harnessapi auto-registers each skill as a FastMCP tool and mounts the server at /mcp.
-- harnessapi adds skill discovery, streaming conventions, multi-tenancy, and the CLI — the assembly layer that eliminates the scaffolding.
+| Principle | What it means |
+|---|---|
+| **Skill-first** | The capability is the unit. Routes and tool registrations are derived from it, not defined alongside it. |
+| **Zero boilerplate** | No decorators, no schema files, no separate server process. If you didn't write it in the skill folder, harnessapi handles it. |
+| **Streaming native** | SSE by default. Plain JSON with one header change. Same handler, same URL either way. |
+| **Agent-ready** | MCP tools, hot-swap, per-user variants, sandbox execution — built in from the start, not bolted on. |
+| **Composable** | harnessapi is a FastAPI subclass. All FastAPI middleware, routers, auth, and dependency injection work exactly as documented. |
 
 ---
 
-## Quick Start
+## Built on FastAPI and FastMCP
+
+harnessapi is not a replacement for either — it is built on both and exposes them fully.
+
+- **FastAPI** handles HTTP routing, request validation, and the OpenAPI schema. Every harnessapi app *is* a FastAPI app.
+- **FastMCP** handles the MCP server. harnessapi auto-registers each skill as a FastMCP tool and mounts the server at `/mcp`.
+- **harnessapi** adds skill discovery, streaming conventions, multi-tenancy, and the CLI — the assembly layer that eliminates the scaffolding.
+
+---
+
+## Where to go next
+
+  
+    Get a streaming skill live in 60 seconds. [Start here →](/harnessapi/guides/quickstart)
+  
+  
+    Full folder structure — models, handlers, TOML config, multi-file skills. [Learn more →](/harnessapi/concepts/skill-folders)
+  
+  
+    return vs yield, SSE event format, Python and JS clients. [Learn more →](/harnessapi/concepts/streaming)
+  
+  
+    How skills become MCP tools. Connect Claude Desktop, Claude Code, Cursor. [Learn more →](/harnessapi/concepts/mcp)
+  
+  
+    Per-user variants, sandboxes, agent-driven customization. [Learn more →](/harnessapi/multi-tenancy)
+  
+  
+    Real implementations — factorial streaming, LLM summarizer, web scraper. [Browse →](/harnessapi/examples/factorial)
+
+---
+
+## Quick start
 
 Get a skill live as a streaming HTTP API and MCP tool in under 60 seconds.
 
-### Option A — Try instantly with uvx
+---
 
-No install needed. uvx runs harnessapi in an isolated environment:
+## Option A — Try it instantly with `uvx`
 
-    uvx harnessapi init my-project
-    cd my-project
-    uvx harnessapi run
+No install needed. `uvx` runs harnessapi in a temporary isolated environment:
 
-This creates a project with a sample greet skill. The scaffolded project:
+1. **Scaffold a new project**
 
-    my-project/
-    ├── skills/
-    │   └── greet/
-    │       ├── models.py    ← Input and Output models
-    │       ├── handler.py   ← async handle() function
-    │       └── skill.toml   ← name, description, MCP config
-    └── main.py              ← HarnessAPI app entry point
+   ```bash
+   uvx harnessapi init my-project
+   cd my-project
+   ```
 
-Call your skill:
+   This creates a project with a sample `greet` skill already wired up:
 
-    # Streaming response (SSE — default)
-    curl -X POST http://localhost:8000/skills/greet \
-      -H "Content-Type: application/json" \
-      -d '{"name": "world"}'
-    # → event: result / data: {"message": "Hello, world! ...", "length": 36} / event: done
+   ```
+   my-project/
+   ├── skills/
+   │   └── greet/
+   │       ├── models.py    ← Input and Output models
+   │       ├── handler.py   ← your async handle() function
+   │       └── skill.toml   ← name, description, MCP config
+   └── main.py              ← HarnessAPI app entry point
+   ```
 
-    # Plain JSON
-    curl -X POST http://localhost:8000/skills/greet \
-      -H "Content-Type: application/json" \
-      -H "Accept: application/json" \
-      -d '{"name": "world"}'
-    # → {"message": "Hello, world! Welcome to harnessapi.", "length": 36}
+2. **Start the server**
 
-Your skill is also available at http://localhost:8000/mcp (MCP) and http://localhost:8000/docs (Swagger).
+   ```bash
+   uvx harnessapi run
+   ```
 
-### Option B — Add to an existing project
+   harnessapi scans the `skills/` directory, registers the `greet` skill, and starts listening on port 8000. You'll see the skill and its endpoint logged to stdout.
 
-    uv add harnessapi
-    # or: pip install harnessapi
+3. **Call your skill**
 
-Create skill files, then run:
+   In a new terminal:
 
-    harnessapi run
+   ```bash
+   # Streaming response (default — SSE)
+   curl -X POST http://localhost:8000/skills/greet \
+     -H "Content-Type: application/json" \
+     -d '{"name": "world"}'
+   ```
 
-### Try streaming
+   ```
+   event: result
+   data: {"message": "Hello, world! Welcome to harnessapi.", "length": 36}
 
-Change handle() to use yield:
+   event: done
+   data:
+   ```
 
-    async def handle(input: Input):
-        words = f"Hello, {input.name}!".split()
-        for word in words:
-            yield word + " "
+   ```bash
+   # Plain JSON (add Accept header)
+   curl -X POST http://localhost:8000/skills/greet \
+     -H "Content-Type: application/json" \
+     -H "Accept: application/json" \
+     -d '{"name": "world"}'
+   ```
 
-Each word arrives as a separate SSE chunk. Accept: application/json still works — harnessapi collects all chunks and returns {"chunks": [...]}.
+   ```json
+   {"message": "Hello, world! Welcome to harnessapi.", "length": 36}
+   ```
+
+Your skill is also available as an MCP tool at `http://localhost:8000/mcp` and has interactive Swagger docs at `http://localhost:8000/docs`.
+
+---
+
+## What just happened?
+
+harnessapi discovered the `greet/` folder, read `models.py` to understand the input/output schema, and did three things automatically:
+
+1. Registered `POST /skills/greet` as an HTTP endpoint with SSE streaming
+2. Registered `greet` as an MCP tool at `/mcp` with the schema derived from `Input`
+3. Added the skill to the Swagger UI at `/docs` with a working "Try it out" button
+
+No routes to define. No tool schemas to write. The folder structure is the configuration.
+
+---
+
+## Option B — Add to an existing project
+
+1. **Install**
+
+   
+     
+       ```bash
+       uv add harnessapi
+       ```
+     
+     
+       ```bash
+       pip install harnessapi
+       ```
+     
+   
+
+2. **Create a skill folder**
+
+   ```
+   skills/
+   └── greet/
+       ├── models.py
+       ├── handler.py
+       └── skill.toml
+   ```
+
+3. **Define your models**
+
+   ```python title="skills/greet/models.py"
+   from harnessapi import SkillInput, SkillOutput
+
+   class Input(SkillInput):
+       name: str
+
+   class Output(SkillOutput):
+       message: str
+       length: int
+   ```
+
+   `SkillInput` is a Pydantic `BaseModel` with `extra="forbid"` — unknown fields are rejected before your handler runs.
+
+4. **Write your handler**
+
+   ```python title="skills/greet/handler.py"
+   from .models import Input, Output
+
+   async def handle(input: Input) -> Output:
+       message = f"Hello, {input.name}! Welcome to harnessapi."
+       return Output(message=message, length=len(message))
+   ```
+
+   `handle` is always an `async` function. Return a value for a single response, or `yield` chunks to stream.
+
+5. **Configure the skill**
+
+   ```toml title="skills/greet/skill.toml"
+   [skill]
+   description  = "Greet someone by name"
+   is_mcp       = true
+   tags         = ["demo"]
+   timeout_secs = 30
+   ```
+
+6. **Create the app**
+
+   ```python title="main.py"
+   from pathlib import Path
+   from harnessapi import HarnessAPI
+
+   app = HarnessAPI(skills_dir=Path(__file__).parent / "skills")
+   ```
+
+7. **Run**
+
+   ```bash
+   harnessapi run
+   ```
+
+---
+
+## Try streaming
+
+Change your handler to use `yield` and see streaming in action — no other changes needed:
+
+```python title="skills/greet/handler.py"
+from .models import Input, Output
+
+async def handle(input: Input):
+    words = f"Hello, {input.name}! Welcome to harnessapi.".split()
+    for word in words:
+        yield word + " "
+```
+
+Call it the same way — you'll now see each word arrive as a separate SSE chunk:
+
+```bash
+curl -X POST http://localhost:8000/skills/greet \
+  -H "Content-Type: application/json" \
+  -d '{"name": "world"}'
+```
+
+```
+event: chunk
+data: Hello,
+
+event: chunk
+data: world!
+
+event: chunk
+data: Welcome
+
+event: chunk
+data: to
+
+event: chunk
+data: harnessapi.
+
+event: done
+data:
+```
+
+The `Accept: application/json` header still works — harnessapi collects all chunks and returns `{"chunks": [...]}`. No code changes.
+
+---
+
+## What's running
+
+| URL | What |
+|-----|------|
+| `POST http://localhost:8000/skills/greet` | HTTP endpoint — SSE by default |
+| `GET http://localhost:8000/docs` | Swagger UI — interactive "Try it out" |
+| `http://localhost:8000/mcp` | MCP server — add to Claude Desktop or Cursor |
+
+---
+
+## Next steps
+
+| Topic | Why read it |
+|---|---|
+| [Skill folders](/harnessapi/concepts/skill-folders) | Full folder structure, naming, multi-file handlers, validation |
+| [Streaming (SSE)](/harnessapi/concepts/streaming) | SSE event format, Python and JS client examples, error handling |
+| [MCP tools](/harnessapi/concepts/mcp) | How to connect Claude Desktop, Claude Code, Cursor, Copilot |
+| [Examples](/harnessapi/examples/factorial) | Real skill implementations with real use cases |
+| [Multi-tenancy](/harnessapi/multi-tenancy) | Per-user skill variants, sandboxes, agent-driven customization |
 
 ---
 
 ## Installation
 
-Requirements: Python 3.11 or higher. uv (recommended) or pip.
+## Requirements
 
-Python 3.11 is the minimum because harnessapi uses tomllib (stdlib, 3.11+) for skill.toml parsing and relies on asyncio improvements introduced in 3.11 for reliable streaming and timeout behavior.
+- Python **3.11 or higher**
+- [uv](https://docs.astral.sh/uv/) (recommended) or pip
 
-    uv add harnessapi
-    # or: pip install harnessapi
-    # or without installing: uvx harnessapi init my-project && uvx harnessapi run
-
-### Optional extras (sandbox providers)
-
-    uv add "harnessapi[docker]"       # Docker sandbox provider
-    uv add "harnessapi[kubernetes]"   # Kubernetes sandbox provider
-    uv add "harnessapi[docker,kubernetes]"
-
-The base install supports local_subprocess sandboxes with no extra deps.
-
-### Install from source
-
-    git clone https://github.com/edwinjosechittilappilly/harnessapi
-    cd harnessapi
-    uv sync
-    uv run pytest
-
-### Dependencies installed automatically
-
-fastapi, fastmcp, pydantic, uvicorn, sse-starlette, anyio.
+Python 3.11 is the minimum because harnessapi uses `tomllib` (stdlib, 3.11+) for `skill.toml` parsing and relies on asyncio improvements introduced in 3.11 for reliable streaming and timeout behavior.
 
 ---
 
-## Skill Folders
+## Install with uv (recommended)
 
-A skill folder is the fundamental building block of harnessapi. Each folder is a self-contained capability: it declares its inputs and outputs, implements its logic, and optionally configures metadata. harnessapi discovers it at startup and exposes it as an HTTP endpoint, an MCP tool, and a Swagger entry — no additional code required.
+```bash
+uv add harnessapi
+```
 
-### Discovery lifecycle
+uv resolves and installs dependencies significantly faster than pip and produces a lockfile automatically. If you don't have uv yet:
 
-When HarnessAPI starts, it scans skills_dir and for every subfolder containing both handler.py and models.py:
-1. Imports models.py and validates that Input and Output classes exist
-2. Imports handler.py and locates the handle async function
-3. Reads skill.toml (or SKILL.md) for metadata
-4. Registers POST /skills/{name} as an HTTP endpoint (SSE streaming by default)
-5. Registers {name} as a FastMCP tool at /mcp
-6. Adds the skill to the OpenAPI schema at /docs
+```bash
+curl -LsSf https://astral.sh/uv/install.sh | sh
+```
 
-### Skill naming
+---
 
-The skill name is derived from the folder name by default. Override in skill.toml with `name = "my-name"`. The folder name becomes the URL slug exactly: greet → POST /skills/greet, summarize-text → POST /skills/summarize-text.
+## Install with pip
 
-### Minimum structure
+```bash
+pip install harnessapi
+```
 
-    skills/
-    └── my-skill/
-        ├── handler.py    ← required
-        └── models.py     ← required
+---
 
-### Full structure
+## Try without installing
 
-    skills/
-    └── my-skill/
-        ├── handler.py        ← required: async handle() function
-        ├── models.py         ← required: Pydantic Input + Output
-        ├── skill.toml        ← optional: name, description, tags, timeout
-        ├── SKILL.md          ← optional: agentskills.io compatible metadata
-        ├── defaults/
-        │   └── input.json    ← optional: default values shown in /docs
-        └── examples/
-            └── 01.json       ← optional: {input, output} pairs for /docs
+Use `uvx` to run harnessapi commands in a temporary isolated environment — no install step, no virtual environment to manage:
 
-### models.py
+```bash
+# Scaffold and run a new project
+uvx harnessapi init my-project
+cd my-project
+uvx harnessapi run
+```
 
-    from harnessapi import SkillInput, SkillOutput
+This is the fastest way to evaluate harnessapi or run it in CI without a persistent install.
 
-    class Input(SkillInput):
-        text: str
-        max_length: int = 200
-        include_word_count: bool = False
+---
 
-    class Output(SkillOutput):
-        summary: str
-        word_count: int | None = None
+## Optional extras
 
-SkillInput extends BaseModel with extra="forbid" — any unrecognized field returns a 422 Unprocessable Entity before your handler is called. Nested Pydantic models work exactly as normal.
+Install additional providers for per-tenant sandboxes (only needed if you use the multi-tenancy sandbox feature):
 
-### handler.py
+```bash
+# Docker sandbox provider
+uv add "harnessapi[docker]"
 
-    from .models import Input, Output
+# Kubernetes sandbox provider
+uv add "harnessapi[kubernetes]"
 
-    # Non-streaming
-    async def handle(input: Input) -> Output:
-        return Output(summary=input.text[:input.max_length])
+# Both
+uv add "harnessapi[docker,kubernetes]"
+```
 
-    # Streaming
-    async def handle(input: Input):
-        for word in input.text.split():
-            yield word + " "
+The base install (`harnessapi` with no extras) supports `local_subprocess` sandboxes out of the box — no extra deps needed for development.
 
-Handlers are always async. Relative imports from other files in the same folder work out of the box.
+---
 
-### skill.toml
+## Verify the install
 
-    [skill]
-    name         = "summarize"
-    description  = "Summarize text to a target length"
-    is_mcp       = true
-    tags         = ["text", "nlp"]
-    timeout_secs = 30
+```bash
+harnessapi --help
+```
 
-### defaults/input.json
+Expected output:
 
-Populates the Swagger "Try it out" form with pre-filled values:
+```
+Usage: harnessapi [OPTIONS] COMMAND [ARGS]...
 
-    {"text": "Python is a high-level programming language...", "max_length": 100}
+  harnessapi — skill-first streaming API and MCP tool framework.
 
-### examples/01.json
+Options:
+  --help  Show this message and exit.
 
-Input/output example pairs shown in the Swagger schema:
+Commands:
+  init  Scaffold a new harnessapi project or skill.
+  run   Start the harnessapi development server.
+```
 
-    {"input": {"text": "Python is a language.", "max_length": 10}, "output": {"summary": "Python is "}}
+If you see this, the CLI is installed and working.
+
+---
+
+## Install from source (contributors)
+
+```bash
+git clone https://github.com/edwinjosechittilappilly/harnessapi
+cd harnessapi
+uv sync
+```
+
+`uv sync` installs the project and all development dependencies from the lockfile. Run the test suite:
+
+```bash
+uv run pytest
+```
+
+---
+
+## Core dependencies
+
+harnessapi installs these automatically — no manual installation needed:
+
+| Package | Purpose |
+|---------|---------|
+| `fastapi` | HTTP server, routing, OpenAPI/Swagger |
+| `fastmcp` | MCP server and tool registration |
+| `pydantic` | Input/output validation |
+| `uvicorn` | ASGI server |
+| `sse-starlette` | Server-Sent Events streaming |
+| `anyio` | Async runtime compatibility |
+
+---
+
+## Skill folders
+
+A **skill folder** is the fundamental building block of harnessapi. Each folder is a self-contained capability: it declares its inputs and outputs, implements its logic, and optionally configures metadata. harnessapi discovers it at startup and exposes it as an HTTP endpoint, an MCP tool, and a Swagger entry — no additional code required.
+
+---
+
+## Discovery lifecycle
+
+When `HarnessAPI` starts, it scans `skills_dir` and for every subfolder containing both `handler.py` and `models.py`:
+
+1. Imports `models.py` and validates that `Input` and `Output` classes exist
+2. Imports `handler.py` and locates the `handle` async function
+3. Reads `skill.toml` (or `SKILL.md`) for metadata — name, description, tags, timeout
+4. Registers `POST /skills/{name}` as an HTTP endpoint (SSE streaming by default)
+5. Registers `{name}` as a FastMCP tool at `/mcp`
+6. Adds the skill to the OpenAPI schema at `/docs`
+
+Folders missing either required file are skipped with a warning. No restart is needed when you add a new skill — just restart the server.
+
+---
+
+## Skill naming
+
+The skill name is derived from the folder name by default. harnessapi uses the folder name as-is for the URL slug:
+
+| Folder name | HTTP endpoint | MCP tool name |
+|---|---|---|
+| `greet` | `POST /skills/greet` | `greet` |
+| `summarize-text` | `POST /skills/summarize-text` | `summarize-text` |
+| `image_caption` | `POST /skills/image_caption` | `image_caption` |
+
+Override the name in `skill.toml`:
+
+```toml
+[skill]
+name = "summarize"   # overrides the folder name
+```
+
+---
+
+## Minimum structure
+
+```
+skills/
+└── my-skill/
+    ├── handler.py    ← required
+    └── models.py     ← required
+```
+
+---
+
+## Full structure
+
+```
+skills/
+└── my-skill/
+    ├── handler.py        ← required: async handle() function
+    ├── models.py         ← required: Pydantic Input + Output
+    ├── skill.toml        ← optional: name, description, tags, timeout
+    ├── SKILL.md          ← optional: agentskills.io compatible metadata
+    ├── defaults/
+    │   └── input.json    ← optional: default values shown in /docs
+    └── examples/
+        └── 01.json       ← optional: {input, output} pairs for /docs
+```
+
+---
+
+## models.py
+
+Defines the skill's input and output using Pydantic:
+
+```python
+from harnessapi import SkillInput, SkillOutput
+
+class Input(SkillInput):
+    text: str
+    max_length: int = 200          # optional field with default
+    include_word_count: bool = False
+
+class Output(SkillOutput):
+    summary: str
+    word_count: int | None = None
+```
+
+**`SkillInput`** extends `BaseModel` with `extra="forbid"` — any unrecognized field in the request body returns a `422 Unprocessable Entity` before your handler is called:
+
+```json
+{
+  "detail": [
+    {
+      "type": "extra_forbidden",
+      "loc": ["body", "unknown_field"],
+      "msg": "Extra inputs are not permitted"
+    }
+  ]
+}
+```
+
+This makes your skill's contract explicit: callers know exactly which fields are accepted. Use `Optional` fields with defaults for parameters that are not always required.
+
+**Nested models** work exactly as in Pydantic:
+
+```python
+class Metadata(BaseModel):
+    author: str
+    language: str = "en"
+
+class Input(SkillInput):
+    text: str
+    metadata: Metadata | None = None
+```
+
+---
+
+## handler.py
+
+Contains the `handle` async function — either returning a value (non-streaming) or yielding chunks (streaming):
+
+```python
+from .models import Input, Output
+
+# Non-streaming — return a single Output
+async def handle(input: Input) -> Output:
+    summary = input.text[:input.max_length]
+    count = len(input.text.split()) if input.include_word_count else None
+    return Output(summary=summary, word_count=count)
+
+# Streaming — yield chunks progressively
+async def handle(input: Input):
+    words = input.text.split()
+    for word in words:
+        yield word + " "
+```
+
+Handlers are always `async`. Relative imports from other files in the same folder work out of the box.
+
+---
+
+## Multi-file handlers
+
+For larger skills, split logic across multiple files in the folder:
+
+```
+skills/summarize/
+├── handler.py
+├── models.py
+├── chunker.py     ← helper module
+└── prompts.py     ← prompt templates
+```
+
+```python title="skills/summarize/handler.py"
+from .models import Input, Output
+from .chunker import split_into_chunks
+from .prompts import SUMMARIZE_PROMPT
+
+async def handle(input: Input) -> Output:
+    chunks = split_into_chunks(input.text, size=500)
+    summary = await summarize_chunks(chunks, SUMMARIZE_PROMPT)
+    return Output(summary=summary)
+```
+
+The entire folder is a Python package — any standard import pattern works.
+
+---
+
+## skill.toml
+
+Controls metadata, MCP visibility, and timeout:
+
+```toml
+[skill]
+name         = "summarize"          # optional: overrides folder name
+description  = "Summarize text to a target length"
+is_mcp       = true                 # set false to hide from MCP clients
+tags         = ["text", "nlp"]
+timeout_secs = 30                   # default: 30
+```
+
+If `skill.toml` is absent, harnessapi uses the folder name as the skill name and the `handle` docstring (if present) as the description.
+
+---
+
+## SKILL.md
+
+Optional [agentskills.io](https://agentskills.io) compatible metadata file. harnessapi reads the YAML frontmatter:
+
+```markdown
+---
+name: summarize
+description: Summarize text to a target length. Use when asked to shorten or condense text.
+license: MIT
+compatibility: Python 3.11+
+argument-hint: The text to summarize
+---
+
+Summarizes the input text by truncating to the specified maximum length.
+```
+
+`skill.toml` values take priority over `SKILL.md` frontmatter when both are present.
+
+---
+
+## defaults/input.json
+
+Populates the Swagger UI "Try it out" form with realistic default values:
+
+```json title="skills/summarize/defaults/input.json"
+{
+  "text": "Python is a high-level, general-purpose programming language...",
+  "max_length": 100,
+  "include_word_count": true
+}
+```
+
+These values appear pre-filled when a user opens `/docs` and clicks "Try it out" for the skill. They do not affect runtime behavior.
+
+---
+
+## examples/01.json
+
+Provides input/output example pairs shown in the Swagger schema:
+
+```json title="skills/summarize/examples/01.json"
+{
+  "input": {
+    "text": "Python is a high-level programming language.",
+    "max_length": 20
+  },
+  "output": {
+    "summary": "Python is a high-lev",
+    "word_count": null
+  }
+}
+```
+
+Additional examples follow the same pattern: `02.json`, `03.json`, etc.
+
+---
+
+## Multiple skills
+
+A real project with several skills:
+
+```
+skills/
+├── greet/
+│   ├── handler.py
+│   ├── models.py
+│   └── skill.toml
+├── summarize/
+│   ├── handler.py
+│   ├── models.py
+│   ├── chunker.py
+│   └── skill.toml
+└── translate/
+    ├── handler.py
+    ├── models.py
+    └── skill.toml
+```
+
+Each folder becomes its own endpoint and MCP tool independently. Adding a folder, restarting the server, and the skill is live — no route registration, no tool configuration.
+
+---
+
+## See also
+
+- [Streaming (SSE)](/harnessapi/concepts/streaming) — return vs yield, SSE event format, timeout handling
+- [MCP tools](/harnessapi/concepts/mcp) — how Input models become MCP tool schemas
+- [Quick start](/harnessapi/guides/quickstart) — build your first skill end-to-end
 
 ---
 
 ## Streaming (SSE)
 
-harnessapi endpoints stream by default using Server-Sent Events (SSE). The handler determines the protocol: return a value for a single response, yield values to stream progressively.
-
-### Why SSE by default
-
-SSE is the right transport for LLM-powered skills. Language model output arrives token by token — buffering the entire response before sending creates unnecessary latency. SSE lets the client start rendering the first token while the rest are still generating.
-
-### Non-streaming — return a value
-
-    async def handle(input: Input) -> Output:
-        return Output(result=compute(input.text))
-
-Client receives:
-
-    event: result
-    data: {"result": "..."}
-
-    event: done
-    data:
-
-### Streaming — yield chunks
-
-    async def handle(input: Input):
-        async for token in llm.stream(input.prompt):
-            yield token
-
-Client receives:
-
-    event: chunk
-    data: The answer
-
-    event: chunk
-    data:  is 42.
-
-    event: done
-    data:
-
-### SSE event reference
-
-- chunk: Each value yielded by a streaming handler
-- result: Full JSON from a non-streaming handler
-- done: Always the last event
-- error: Handler raised an exception or timed out
-
-### Switching to plain JSON
-
-Add Accept: application/json — harnessapi collects all output and returns a standard HTTP response. No handler changes needed.
-
-- Non-streaming handler → Output model fields directly: {"summary": "hello", "word_count": 1}
-- Streaming handler → chunks array: {"chunks": ["hello", " ", "world"]}
-
-### Real LLM streaming example
-
-    from openai import AsyncOpenAI
-    client = AsyncOpenAI()
-
-    async def handle(input: Input):
-        stream = await client.chat.completions.create(
-            model="gpt-4o",
-            messages=[{"role": "user", "content": input.prompt}],
-            stream=True,
-        )
-        async for chunk in stream:
-            delta = chunk.choices[0].delta.content
-            if delta:
-                yield delta
-
-### Calling from Python
-
-    import httpx
-
-    # SSE stream
-    with httpx.Client() as client:
-        with client.stream("POST", "http://localhost:8000/skills/chat",
-                           json={"prompt": "What is 6 * 7?"}) as response:
-            for line in response.iter_lines():
-                if line.startswith("data:"):
-                    print(line[5:].strip(), end="", flush=True)
-
-    # JSON
-    r = httpx.post("http://localhost:8000/skills/chat",
-                   json={"prompt": "What is 6 * 7?"},
-                   headers={"Accept": "application/json"})
-    print(r.json())
-
-### Calling from JavaScript (fetch)
-
-    const response = await fetch("http://localhost:8000/skills/chat", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ prompt: "What is 6 * 7?" }),
-    });
-    const reader = response.body.getReader();
-    const decoder = new TextDecoder();
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      for (const line of decoder.decode(value).split("\n")) {
-        if (line.startsWith("data:")) process.stdout.write(line.slice(5).trim());
-      }
-    }
-
-### Error handling
-
-Any exception raised by the handler emits an error event and closes the stream:
-
-    event: error
-    data: ValueError: Input too long
-
-### Timeouts
-
-Set per-skill in skill.toml: timeout_secs = 60 (default: 30). On timeout an error event is emitted. In JSON mode, timeout returns HTTP 504.
+harnessapi endpoints stream by default using **Server-Sent Events (SSE)**. The handler determines the protocol: `return` a value for a single response, `yield` values to stream progressively. The same endpoint, same URL, handles both.
 
 ---
 
-## MCP Tools
+## Why SSE by default
 
-Every skill is automatically registered as a Model Context Protocol (MCP) tool — no extra code, no schema files, no separate server process.
+SSE is the right transport for LLM-powered skills. Language model output arrives token by token — buffering the entire response before sending it creates unnecessary latency and a poor user experience. SSE lets the client start rendering the first token while the rest are still generating.
 
-### What is MCP?
-
-Model Context Protocol is an open standard for connecting AI agents to tools and data. MCP-aware agents (Claude Desktop, Claude Code, Cursor, Copilot) discover your tools at connection time and call them natively with proper schema validation.
-
-### How skills become MCP tools
-
-When HarnessAPI starts, for each skill it:
-1. Reads Input — generates the MCP tool input schema from the Pydantic model fields, types, and defaults
-2. Uses skill.toml metadata — the description becomes the tool description shown to the agent
-3. Wraps the handler — calling the MCP tool calls your handle() function
-4. Handles streaming — streaming handlers (yield) are fully supported; harnessapi collects all yielded chunks and returns them joined as a single string to the MCP client
-
-The tool name is the skill name. No manual schema definition required.
-
-### Connect Claude Desktop
-
-macOS: ~/Library/Application Support/Claude/claude_desktop_config.json
-Windows: %APPDATA%\Claude\claude_desktop_config.json
-
-    {"mcpServers": {"my-skills": {"url": "http://localhost:8000/mcp"}}}
-
-Restart Claude Desktop. Your skills appear in the tool picker.
-
-### Connect Claude Code
-
-    claude mcp add my-skills http://localhost:8000/mcp
-
-Or add under MCP Servers in Claude Code settings.
-
-### Connect Cursor
-
-Open Cursor Settings → MCP → Add Server, add the same JSON config.
-
-### Disable MCP for a specific skill
-
-Set is_mcp = false in skill.toml.
-
-### MCP and multi-tenancy
-
-The /mcp endpoint is always tenant-agnostic — it serves base skill handlers only. For agent-driven management of per-user variants, use the Admin MCP server at /admin-mcp.
-
-### MCP endpoints
-
-- /mcp — FastMCP HTTP (SSE transport), skill tools, tenant-agnostic, always enabled
-- /admin-mcp — management tools, tenant-aware, requires enable_admin_mcp=True
+SSE also suits any long-running computation that can produce incremental output: file processing, web scraping, multi-step reasoning. Clients receive progress as it happens rather than waiting for completion.
 
 ---
 
-## Multi-tenancy Overview
+## Non-streaming — return a value
 
-harnessapi has a built-in multi-tenancy layer. Add one parameter to HarnessAPI(...) and every skill automatically supports per-user variants: same input/output schema, different handler implementation, isolated routing.
+```python
+async def handle(input: Input) -> Output:
+    return Output(result=compute(input.text))
+```
 
-This is the foundation for agent-driven skill customization — users (or the agents acting on their behalf) submit modified handler code via HTTP, test it in a sandbox, and promote it when ready. No restarts, no deploys, no per-tenant route tables.
+The client receives two events — the result, then a done signal:
 
-### How routing works
+```
+event: result
+data: {"result": "..."}
 
-Every POST /skills/{name} request goes through a four-step resolution:
+event: done
+data:
+```
 
-    1. Does user-a have a sandbox?           → forward entire request to sandbox process
-    2. Does user-a have a preview variant?   → run preview handler in-process
-    3. Does user-a have a promoted variant?  → run variant handler in-process
-    4. No variant, no sandbox               → use base skill handler
+---
 
-The route table never grows — dispatch is a single dict lookup per request. Requests without a tenant header always reach the base skill.
+## Streaming — yield chunks
 
-### Drop-in setup
+Use an async generator. No return type annotation needed:
 
-Before (single-tenant):
+```python
+async def handle(input: Input):
+    async for token in llm.stream(input.prompt):
+        yield token
+```
 
-    app = HarnessAPI(skills_dir="./skills")
+Each yielded value becomes a `chunk` event. The `done` event is always the last:
 
-After (multi-tenant):
+```
+event: chunk
+data: The answer
 
-    from harnessapi import HarnessAPI
-    from harnessapi.multitenancy import TenantBackend, SQLiteStorageBackend
+event: chunk
+data:  is
 
-    backend = TenantBackend(
-        tenant_extractor=lambda req: req.headers.get("X-Tenant-ID"),
-        storage=SQLiteStorageBackend(path="./variants.db"),
+event: chunk
+data:  42.
+
+event: done
+data:
+```
+
+---
+
+## SSE event reference
+
+| Event | When emitted | Data |
+|-------|-------------|------|
+| `chunk` | Each value yielded by a streaming handler | The yielded value as a string |
+| `result` | Full JSON from a non-streaming handler | The Output model serialized to JSON |
+| `done` | Always the last event | Empty |
+| `error` | Handler raised an exception or timed out | Error message string |
+
+---
+
+## Switching to plain JSON
+
+Add `Accept: application/json` — harnessapi collects all output and returns a standard HTTP response. No handler changes needed:
+
+```bash
+# SSE (default)
+curl -X POST http://localhost:8000/skills/summarize \
+  -H "Content-Type: application/json" \
+  -d '{"text": "hello world"}'
+
+# Plain JSON
+curl -X POST http://localhost:8000/skills/summarize \
+  -H "Content-Type: application/json" \
+  -H "Accept: application/json" \
+  -d '{"text": "hello world"}'
+```
+
+JSON mode output format:
+
+- **Non-streaming handler** → Output model fields directly: `{"summary": "hello world", "word_count": 2}`
+- **Streaming handler** → chunks collected into an array: `{"chunks": ["hello", " ", "world"]}`
+
+---
+
+## Real LLM streaming example
+
+Using OpenAI-compatible streaming:
+
+```python title="skills/chat/handler.py"
+from openai import AsyncOpenAI
+from .models import Input
+
+client = AsyncOpenAI()
+
+async def handle(input: Input):
+    stream = await client.chat.completions.create(
+        model="gpt-4o",
+        messages=[{"role": "user", "content": input.prompt}],
+        stream=True,
     )
-    app = HarnessAPI(skills_dir="./skills", tenant_backend=backend)
+    async for chunk in stream:
+        delta = chunk.choices[0].delta.content
+        if delta:
+            yield delta
+```
 
-All existing skill endpoints continue to work unchanged. harnessapi adds a /tenants/* management API automatically.
-
-### Core invariants
-
-- Schema never changes per tenant: input_model and output_model are always from the base skill.
-- Variants must be explicitly promoted: sandbox → promoted is a deliberate step.
-- At most one promoted variant per (tenant, skill): promoting a new variant automatically demotes the previous one.
-- MCP tools always use base skills: /mcp is tenant-agnostic.
-
-### Tenant extraction
-
-The tenant_extractor is any callable that reads a request and returns a str | None. It can be sync or async:
-
-    # From a header (most common)
-    tenant_extractor=lambda req: req.headers.get("X-Tenant-ID")
-
-    # From a JWT sub-claim (async)
-    async def from_jwt(req):
-        token = req.headers.get("Authorization", "").removeprefix("Bearer ")
-        return decode_jwt(token).get("sub")
-
-    # From a query parameter
-    tenant_extractor=lambda req: req.query_params.get("tenant")
-
-When the extractor returns None, harnessapi routes to the base skill — no variant lookup.
+The client receives each token as a `chunk` event as soon as the model produces it.
 
 ---
 
-## Variant Lifecycle
+## Calling from Python
 
-A variant is a modified version of a base skill handler that belongs to a specific tenant. Variants share the same input/output schema as the base skill — only the handler implementation changes.
+```python
+import httpx
 
-### Variant statuses
+# SSE stream — process each chunk as it arrives
+with httpx.Client() as client:
+    with client.stream(
+        "POST",
+        "http://localhost:8000/skills/chat",
+        json={"prompt": "What is 6 * 7?"},
+    ) as response:
+        for line in response.iter_lines():
+            if line.startswith("data:"):
+                chunk = line[5:].strip()
+                if chunk:
+                    print(chunk, end="", flush=True)
 
-- sandbox: Created but not yet active. Only reachable via /run — never routes real calls.
-- preview: Active for real traffic as a canary. Routes real tenant calls; coexists with promoted variant.
-- promoted: Fully active. Routes all real tenant calls (unless a preview is set).
+# JSON — block until complete
+response = httpx.post(
+    "http://localhost:8000/skills/chat",
+    json={"prompt": "What is 6 * 7?"},
+    headers={"Accept": "application/json"},
+)
+print(response.json())
+```
 
-At most one promoted and one preview variant can be active per (tenant, skill) at any time.
+---
 
-### Step 1 — Clone the base skill
+## Calling from JavaScript
 
-    curl -X POST http://localhost:8000/tenants/user-a/skills/greet/clone
+**Using `fetch` to read an SSE stream:**
 
-Response includes variant_id, tenant_id, base_skill_name, status: "sandbox", and the base handler source_code as a starting point.
+```javascript
+const response = await fetch("http://localhost:8000/skills/chat", {
+  method: "POST",
+  headers: { "Content-Type": "application/json" },
+  body: JSON.stringify({ prompt: "What is 6 * 7?" }),
+});
 
-### Step 2 — Submit customized source
+const reader = response.body.getReader();
+const decoder = new TextDecoder();
 
-    curl -X POST http://localhost:8000/tenants/user-a/skills/greet/customize \
-      -H "Content-Type: application/json" \
-      -d '{"source_code": "async def handle(input: Input) -> Output:\n    return Output(message=f\"Howdy, {input.name}!\")"}'
+while (true) {
+  const { done, value } = await reader.read();
+  if (done) break;
 
-harnessapi validates the source (AST checks — no dangerous imports, correct function signature) before accepting it. Invalid code returns a 422 with a list of violations.
+  const text = decoder.decode(value);
+  for (const line of text.split("\n")) {
+    if (line.startsWith("data:")) {
+      const chunk = line.slice(5).trim();
+      if (chunk) process.stdout.write(chunk); // or update DOM
+    }
+  }
+}
+```
 
-### Step 3 — Test in sandbox
+**Using the `EventSource` API** (GET-only, not suitable for POST with a body — use `fetch` above for POST skills):
 
-    curl -X POST http://localhost:8000/tenants/user-a/skills/greet/variants/3f2a1.../run \
-      -H "Content-Type: application/json" \
-      -d '{"name": "Alice"}'
-    # → {"message": "Howdy, Alice!"}
+```javascript
+// Only works if your skill accepts GET — most harnessapi skills are POST
+const source = new EventSource("http://localhost:8000/skills/status");
+source.addEventListener("chunk", (e) => console.log(e.data));
+source.addEventListener("done", () => source.close());
+```
+
+For POST-based skills (all harnessapi skill endpoints), use the `fetch` approach above.
+
+---
+
+## Error handling
+
+Any exception raised by the handler emits an `error` event and closes the stream:
+
+```python
+async def handle(input: Input):
+    if len(input.text) > 10000:
+        raise ValueError("Input too long")
+    yield process(input.text)
+```
+
+```
+event: error
+data: ValueError: Input too long
+
+event: (stream closes)
+```
+
+In JSON mode (`Accept: application/json`), errors return an HTTP 500 with a JSON error body instead.
+
+---
+
+## Timeouts
+
+Set per-skill in `skill.toml`:
+
+```toml
+[skill]
+timeout_secs = 60   # default: 30
+```
+
+If the handler does not complete within the timeout, an `error` event is emitted:
+
+```
+event: error
+data: Skill 'summarize' timed out after 60s
+
+event: done
+data:
+```
+
+In JSON mode, a timeout returns HTTP 504.
+
+---
+
+## See also
+
+- [Skill folders](/harnessapi/concepts/skill-folders) — how handlers are discovered and loaded
+- [MCP tools](/harnessapi/concepts/mcp) — how streaming handlers are handled in MCP (chunks are collected)
+- [Examples](/harnessapi/examples/factorial) — real streaming skill implementation
+
+---
+
+## MCP tools
+
+Every skill is automatically registered as a [Model Context Protocol (MCP)](https://modelcontextprotocol.io) tool — no extra code, no schema files, no separate server process to manage.
+
+---
+
+## What is MCP?
+
+Model Context Protocol is an open standard for connecting AI agents to tools and data. Instead of writing glue code to call your API, an MCP-aware agent (Claude Desktop, Claude Code, Cursor, Copilot) discovers your tools at connection time and calls them natively — with proper schema validation, structured outputs, and no HTTP plumbing in the agent's code.
+
+harnessapi implements MCP using [FastMCP](https://github.com/jlowin/fastmcp) and mounts the MCP server at `/mcp` alongside your skill endpoints.
+
+---
+
+## How skills become MCP tools
+
+When `HarnessAPI` starts, for each skill it:
+
+1. **Reads `Input`** — generates the MCP tool input schema from the Pydantic model fields, types, and defaults
+2. **Uses `skill.toml` metadata** — the `description` becomes the tool description shown to the agent
+3. **Wraps the handler** — calling the MCP tool calls your `handle()` function
+4. **Handles streaming** — streaming handlers (`yield`) are fully supported; harnessapi collects all yielded chunks and returns them joined as a single string to the MCP client (MCP is request-response)
+
+The tool name is the skill name (folder name or `name` in `skill.toml`). No manual schema definition required — the Pydantic model is the schema.
+
+---
+
+## Live tool list
+
+The MCP server is dynamic. When you:
+
+- **Add a skill folder** — restart the server, the tool appears
+- **Remove a skill folder** — restart the server, the tool disappears
+- **Update `skill.toml`** — restart to pick up name or description changes
+
+No tool registration code to update. The skill folder is the source of truth.
+
+---
+
+## Connect Claude Desktop
+
+Add to the Claude Desktop MCP config file:
+
+**macOS:** `~/Library/Application Support/Claude/claude_desktop_config.json`
+
+**Windows:** `%APPDATA%\Claude\claude_desktop_config.json`
+
+```json
+{
+  "mcpServers": {
+    "my-skills": {
+      "url": "http://localhost:8000/mcp"
+    }
+  }
+}
+```
+
+Restart Claude Desktop. Your skills appear in the tool picker — Claude can call them directly during a conversation.
+
+---
+
+## Connect Claude Code
+
+Claude Code supports MCP servers via the CLI:
+
+```bash
+claude mcp add my-skills http://localhost:8000/mcp
+```
+
+Or add it manually in Claude Code settings under **MCP Servers**. The skills appear as tools available in any Claude Code session.
+
+---
+
+## Connect Cursor
+
+Open **Cursor Settings → MCP → Add Server**:
+
+```json
+{
+  "my-skills": {
+    "url": "http://localhost:8000/mcp"
+  }
+}
+```
+
+---
+
+## Connect VS Code / GitHub Copilot
+
+Any MCP-compatible client works. In VS Code with the Copilot extension, add the server URL in the MCP settings panel. Check your client's documentation for the exact location — the URL is always `http://localhost:8000/mcp`.
+
+---
+
+## Tool naming
+
+The MCP tool name matches the skill name exactly:
+
+| Folder | `skill.toml` name override | MCP tool name |
+|---|---|---|
+| `greet/` | — | `greet` |
+| `summarize-text/` | — | `summarize-text` |
+| `my_skill/` | `name = "process"` | `process` |
+
+Agents reference tools by this name. Keep names descriptive and stable — renaming a tool breaks existing agent workflows that reference it by name.
+
+---
+
+## Disabling MCP for a skill
+
+Set `is_mcp = false` in `skill.toml` to exclude a skill from the MCP server while keeping its HTTP endpoint active:
+
+```toml
+[skill]
+description = "Internal skill — HTTP only, not exposed as MCP tool"
+is_mcp      = false
+```
+
+This is useful for internal or admin skills that should not be callable by external agents.
+
+---
+
+## MCP and streaming
+
+MCP is a request-response protocol — there is no native streaming. When a streaming handler is called via MCP:
+
+1. harnessapi calls the handler and collects all yielded chunks
+2. Joins them as a single string
+3. Returns the joined string as the MCP tool result
+
+For clients that need streaming output, use the HTTP endpoint (`POST /skills/{name}`) directly instead of MCP.
+
+---
+
+## MCP and multi-tenancy
+
+The `/mcp` endpoint is always **tenant-agnostic** — it serves base skill handlers only. It has no concept of `X-Tenant-ID` or promoted variants.
+
+For agent-driven **management** of per-user variants (clone, customize, promote, sandbox), use the **Admin MCP server** at `/admin-mcp`. See [Admin MCP server](/harnessapi/multi-tenancy/admin-mcp) for setup.
+
+---
+
+## MCP server name
+
+Customize the server name shown in MCP client UIs:
+
+```python
+app = HarnessAPI(
+    skills_dir="./skills",
+    mcp_server_name="My Skills Server",
+)
+```
+
+---
+
+## MCP endpoints
+
+| Path | Protocol | Purpose |
+|------|----------|---------|
+| `/mcp` | FastMCP HTTP (SSE transport) | Skill tools — tenant-agnostic |
+| `/admin-mcp` | FastMCP HTTP | Variant management tools — requires `enable_admin_mcp=True` |
+
+---
+
+## See also
+
+- [Skill folders](/harnessapi/concepts/skill-folders) — how `Input` models become tool schemas
+- [Streaming (SSE)](/harnessapi/concepts/streaming) — how streaming differs between HTTP and MCP
+- [Admin MCP server](/harnessapi/multi-tenancy/admin-mcp) — agent-native multi-tenancy management
+- [Connect to Claude Desktop](/harnessapi/guides/claude-desktop) — detailed Claude Desktop setup guide
+
+---
+
+## Factorial — streaming skill
+
+This example ships with the harnessapi repo. It computes `n!` step-by-step, streaming each multiplication as an SSE event — and exposes the same logic as an MCP tool.
+
+**What it demonstrates:**
+- Async generator handler (`yield` for streaming)
+- Integer input validation via Pydantic
+- Calling via curl (SSE and JSON modes)
+- MCP tool usage from Claude Desktop
+
+---
+
+## Skill files
+
+```python title="skills/factorial/models.py"
+from harnessapi import SkillInput, SkillOutput
+
+class Input(SkillInput):
+    n: int
+
+class Output(SkillOutput):
+    result: int
+    steps: list[str]
+```
+
+```python title="skills/factorial/handler.py"
+"""Compute factorial of n, streaming each multiplication step."""
+from .models import Input
+
+async def handle(input: Input):
+    if input.n < 0:
+        raise ValueError("n must be a non-negative integer")
+    acc = 1
+    if input.n == 0:
+        yield "0! = 1"
+        return
+    yield "start: 1"
+    for i in range(2, input.n + 1):
+        acc *= i
+        yield f"{i}: {acc}"
+```
+
+```toml title="skills/factorial/skill.toml"
+[skill]
+description  = "Compute the factorial of n, streaming each step"
+is_mcp       = true
+tags         = ["math", "demo"]
+timeout_secs = 10
+```
+
+```python title="main.py"
+from pathlib import Path
+from harnessapi import HarnessAPI
+
+app = HarnessAPI(
+    skills_dir=Path(__file__).parent / "skills",
+    title="Factorial Harness",
+    description="Demo: factorial as a streaming skill + MCP tool",
+)
+```
+
+---
+
+## Run it
+
+1. **Clone and run**
+
+   ```bash
+   git clone https://github.com/edwinjosechittilappilly/harnessapi
+   cd harnessapi
+   uv sync
+   uv run uvicorn examples.factorial_app.main:app --reload
+   ```
+
+2. **Call via SSE (streaming)**
+
+   ```bash
+   curl -X POST http://localhost:8000/skills/factorial \
+     -H "Content-Type: application/json" \
+     -d '{"n": 5}'
+   ```
+
+   ```
+   event: chunk
+   data: start: 1
+
+   event: chunk
+   data: 2: 2
+
+   event: chunk
+   data: 3: 6
+
+   event: chunk
+   data: 4: 24
+
+   event: chunk
+   data: 5: 120
+
+   event: done
+   data:
+   ```
+
+3. **Call via JSON**
+
+   ```bash
+   curl -X POST http://localhost:8000/skills/factorial \
+     -H "Content-Type: application/json" \
+     -H "Accept: application/json" \
+     -d '{"n": 5}'
+   ```
+
+   ```json
+   {"chunks": ["start: 1", "2: 2", "3: 6", "4: 24", "5: 120"]}
+   ```
+
+4. **Open Swagger UI**
+
+   Visit `http://localhost:8000/docs` — try it interactively.
+
+---
+
+## Summarizer — LLM skill
+
+This example shows how to wrap an LLM call (using the OpenAI SDK) as a streaming harnessapi skill. The same handler becomes an HTTP SSE endpoint **and** an MCP tool that Claude can call directly.
+
+**What it demonstrates:**
+- Streaming LLM output token-by-token with `yield`
+- API key via environment variable
+- Converting an existing agentskills.io skill with `harnessapi init --skill`
+
+---
+
+## Skill files
+
+```python title="skills/summarize/models.py"
+from harnessapi import SkillInput, SkillOutput
+
+class Input(SkillInput):
+    text: str
+    max_words: int = 100
+    style: str = "concise"   # concise | bullet | formal
+
+class Output(SkillOutput):
+    summary: str
+```
+
+```python title="skills/summarize/handler.py"
+"""Summarize text using an LLM, streaming tokens as they arrive."""
+import os
+from openai import AsyncOpenAI
+from .models import Input
+
+client = AsyncOpenAI(api_key=os.environ["OPENAI_API_KEY"])
+
+async def handle(input: Input):
+    prompt = (
+        f"Summarize the following text in {input.max_words} words or fewer. "
+        f"Style: {input.style}.\n\n{input.text}"
+    )
+    stream = await client.chat.completions.create(
+        model="gpt-4o-mini",
+        messages=[{"role": "user", "content": prompt}],
+        stream=True,
+    )
+    async for chunk in stream:
+        token = chunk.choices[0].delta.content
+        if token:
+            yield token
+```
+
+```toml title="skills/summarize/skill.toml"
+[skill]
+description  = "Summarize text using an LLM. Use when asked to shorten, condense, or summarize."
+is_mcp       = true
+tags         = ["llm", "text", "nlp"]
+timeout_secs = 60
+```
+
+---
+
+## Run it
+
+1. **Set your API key**
+
+   ```bash
+   export OPENAI_API_KEY=sk-...
+   ```
+
+2. **Install**
+
+   ```bash
+   uv add harnessapi openai
+   ```
+
+3. **Create `main.py`**
+
+   ```python title="main.py"
+   from pathlib import Path
+   from harnessapi import HarnessAPI
+
+   app = HarnessAPI(skills_dir=Path(__file__).parent / "skills")
+   ```
+
+4. **Run**
+
+   ```bash
+   harnessapi run
+   ```
+
+5. **Stream a summary**
+
+   ```bash
+   curl -X POST http://localhost:8000/skills/summarize \
+     -H "Content-Type: application/json" \
+     -d '{
+       "text": "Large language models are neural networks trained on vast text...",
+       "max_words": 20,
+       "style": "concise"
+     }'
+   ```
+
+   ```
+   event: chunk
+   data: Large language models are
+
+   event: chunk
+   data:  neural networks trained
+
+   event: chunk
+   data:  on massive text datasets.
+
+   event: done
+   data:
+   ```
+
+## Convert an existing agentskills.io skill
+
+If you already have a `summarize/` folder with a `SKILL.md`, harnessapi can add the handler and models automatically:
+
+```bash
+harnessapi init --skill ./skills/summarize
+```
+
+This generates `handler.py`, `models.py`, and `skill.toml` stubs without touching your `SKILL.md`.
+
+  Connect this to Claude Desktop via MCP and Claude can summarize any text you paste — streaming the tokens in real time.
+
+---
+
+## Web scraper
+
+This example wraps a `httpx` + `BeautifulSoup` web scraper as a streaming harnessapi skill. Each scraped section streams as an SSE chunk. Claude or Cursor can call it as an MCP tool to browse the web on your behalf.
+
+**What it demonstrates:**
+- Wrapping an existing Python function using `harnessapi init --function`
+- Streaming multi-section content
+- Real-world MCP tool usage with Claude
+
+---
+
+## Skill files
+
+```python title="skills/scrape/models.py"
+from harnessapi import SkillInput, SkillOutput
+
+class Input(SkillInput):
+    url: str
+    selector: str = "p"   # CSS selector for elements to extract
+
+class Output(SkillOutput):
+    content: str
+```
+
+```python title="skills/scrape/handler.py"
+"""Scrape a URL and stream each matched element's text."""
+import httpx
+from bs4 import BeautifulSoup
+from .models import Input
+
+async def handle(input: Input):
+    async with httpx.AsyncClient(follow_redirects=True, timeout=15) as client:
+        r = await client.get(input.url)
+        r.raise_for_status()
+
+    soup = BeautifulSoup(r.text, "html.parser")
+    elements = soup.select(input.selector)
+
+    if not elements:
+        yield f"No elements matched selector '{input.selector}'"
+        return
+
+    for el in elements:
+        text = el.get_text(strip=True)
+        if text:
+            yield text
+```
+
+```toml title="skills/scrape/skill.toml"
+[skill]
+description  = "Scrape a URL and stream matching element text. Use when asked to read, fetch, or browse a webpage."
+is_mcp       = true
+tags         = ["web", "scraping"]
+timeout_secs = 30
+```
+
+---
+
+## Run it
+
+1. **Install**
+
+   ```bash
+   uv add harnessapi httpx beautifulsoup4
+   ```
+
+2. **Create `main.py` and run**
+
+   ```python title="main.py"
+   from pathlib import Path
+   from harnessapi import HarnessAPI
+
+   app = HarnessAPI(skills_dir=Path(__file__).parent / "skills")
+   ```
+
+   ```bash
+   harnessapi run
+   ```
+
+3. **Scrape a page**
+
+   ```bash
+   curl -X POST http://localhost:8000/skills/scrape \
+     -H "Content-Type: application/json" \
+     -d '{"url": "https://example.com", "selector": "p"}'
+   ```
+
+   ```
+   event: chunk
+   data: This domain is for use in illustrative examples in documents.
+
+   event: chunk
+   data: You may use this domain in literature without prior coordination.
+
+   event: done
+   data:
+   ```
+
+## Generate from an existing function
+
+If you have a scraping function in `utils/scraper.py`, harnessapi can scaffold the whole skill:
+
+```bash
+harnessapi init --function utils/scraper.py --output skills
+```
+
+This inspects the function's type annotations and generates `models.py`, `handler.py`, `SKILL.md`, and `skill.toml` automatically.
+
+  Always respect `robots.txt` and the site's terms of service when scraping.
+
+---
+
+## Image captioner
+
+This example wraps a GPT-4o vision call as a harnessapi skill. Pass an image URL, get a streaming caption back — over SSE or as a plain JSON response. Exposed as an MCP tool so Claude can caption images during a conversation.
+
+**What it demonstrates:**
+- Vision LLM integration (GPT-4o / Claude claude-haiku-4-5)
+- URL-based image input with Pydantic validation
+- Streaming multimodal output
+- MCP tool for image understanding
+
+---
+
+## Skill files
+
+```python title="skills/caption/models.py"
+from harnessapi import SkillInput, SkillOutput
+from pydantic import HttpUrl
+
+class Input(SkillInput):
+    image_url: HttpUrl
+    detail: str = "auto"   # low | high | auto
+    prompt: str = "Describe this image in detail."
+
+class Output(SkillOutput):
+    caption: str
+```
+
+```python title="skills/caption/handler.py"
+"""Caption an image URL using a vision LLM, streaming tokens."""
+import os
+from openai import AsyncOpenAI
+from .models import Input
+
+client = AsyncOpenAI(api_key=os.environ["OPENAI_API_KEY"])
+
+async def handle(input: Input):
+    stream = await client.chat.completions.create(
+        model="gpt-4o",
+        messages=[
+            {
+                "role": "user",
+                "content": [
+                    {
+                        "type": "image_url",
+                        "image_url": {
+                            "url": str(input.image_url),
+                            "detail": input.detail,
+                        },
+                    },
+                    {"type": "text", "text": input.prompt},
+                ],
+            }
+        ],
+        stream=True,
+    )
+    async for chunk in stream:
+        token = chunk.choices[0].delta.content
+        if token:
+            yield token
+```
+
+```toml title="skills/caption/skill.toml"
+[skill]
+description  = "Caption or describe an image from a URL using a vision LLM. Use when asked to describe, analyse, or caption an image."
+is_mcp       = true
+tags         = ["vision", "llm", "image"]
+timeout_secs = 60
+```
+
+---
+
+## Run it
+
+1. **Install**
+
+   ```bash
+   uv add harnessapi openai
+   export OPENAI_API_KEY=sk-...
+   ```
+
+2. **Run**
+
+   ```bash
+   harnessapi run
+   ```
+
+3. **Caption an image**
+
+   ```bash
+   curl -X POST http://localhost:8000/skills/caption \
+     -H "Content-Type: application/json" \
+     -d '{
+       "image_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/4/47/PNG_transparency_demonstration_1.png/280px-PNG_transparency_demonstration_1.png",
+       "prompt": "What do you see?"
+     }'
+   ```
+
+   ```
+   event: chunk
+   data: The image shows several dice
+
+   event: chunk
+   data:  arranged on a transparent background,
+
+   event: chunk
+   data:  displaying various numbers on their faces.
+
+   event: done
+   data:
+   ```
+
+4. **Call from Claude Desktop**
+
+   After [connecting Claude to your MCP server](/guides/claude-desktop/), Claude can caption any image you share in the conversation — just ask it to use the `caption` tool.
+
+  Swap `gpt-4o` for `claude-haiku-4-5` (via the Anthropic SDK) or any other vision model — the harnessapi handler pattern is the same.
+
+---
+
+## Agentic RAG — multi-tenancy
+
+A complete, runnable agentic RAG system with **per-tenant document isolation** built on
+harnessapi + multi-tenancy. Each tenant gets their own vector store — documents ingested
+by one tenant are invisible to another. The same three skills are served as HTTP SSE
+endpoints **and** MCP tools, and an **admin MCP** lets an agent customize how a skill
+behaves per-tenant without redeploying.
+
+```
+POST /skills/ingest      ← chunk, embed, index a document
+POST /skills/search      ← semantic search + GPT-4o answer (streaming)
+POST /skills/list_docs   ← list indexed documents for this tenant
+GET  /mcp                ← all three skills as MCP tools
+GET  /admin-mcp          ← skill variant + sandbox management (admin only)
+GET  /docs               ← Swagger UI
+```
+
+**What it demonstrates:**
+- Per-tenant vector isolation — one ChromaDB collection per `X-Tenant-ID`
+- Local embeddings with `all-MiniLM-L6-v2` (no API key needed to ingest)
+- Streaming GPT-4o answers token-by-token over SSE
+- The same skills exposed as REST endpoints **and** MCP tools
+- The **admin MCP** + tenant REST API for the clone → customize → preview → promote
+  variant lifecycle
+- Per-tenant subprocess sandboxes provisioned through admin MCP tools
+
+---
+
+## Architecture
+
+```
+Client (curl / Claude Desktop / agent)
+        │
+        │  X-Tenant-ID: tenant-1          ← header identifies tenant
+        ▼
+┌─────────────────────────────────────────┐
+│            harnessapi server            │
+│                                         │
+│  TenantContextMiddleware                │
+│  (copies tenant_id → ContextVar)        │
+│                 │                       │
+│    ┌────────────┼────────────┐          │
+│    ▼            ▼            ▼          │
+│  ingest       search     list_docs      │
+│    │            │                       │
+│    ▼            ▼                       │
+│  ChromaDB (rag_tenant-1)                │  ← isolated per tenant
+│  ChromaDB (rag_tenant-2)                │  ← completely separate
+└─────────────────────────────────────────┘
+        │
+        ▼  (search skill only)
+    OpenAI GPT-4o (streaming answer)
+```
+
+- **Embedding model:** `all-MiniLM-L6-v2` via sentence-transformers — runs locally, no API key needed for ingest.
+- **Vector store:** ChromaDB — persisted to `./chroma_data/`, one collection (`rag_{tenant_id}`) per tenant.
+- **Answer generation:** OpenAI GPT-4o — streaming tokens via SSE.
+- **Variant storage:** SQLite (`./variants.db`) — persists skill customizations across restarts.
+
+---
+
+## The skills
+
+Each skill is a folder under `skills/` with a `models.py` (Pydantic `Input`/`Output`)
+and a `handler.py` (an async `handle` function, optionally a generator for streaming).
+The `skill.toml` adds metadata — `is_mcp = true` exposes the skill as an MCP tool.
+
+### ingest — chunk, embed, index
+
+```toml title="skills/ingest/skill.toml"
+[skill]
+description  = "Ingest a document into the tenant's vector store. Chunks, embeds, and indexes the text for semantic search."
+is_mcp       = true
+tags         = ["rag"]
+timeout_secs = 120
+```
+
+```python title="skills/ingest/models.py"
+from harnessapi import SkillInput, SkillOutput
+
+class Input(SkillInput):
+    text: str
+    doc_id: str
+    metadata: dict[str, str] = {}
+    chunk_size: int = 500
+    chunk_overlap: int = 50
+
+class Output(SkillOutput):
+    doc_id: str
+    chunk_count: int
+    status: str
+```
+
+### search — semantic search + GPT-4o answer
+
+```toml title="skills/search/skill.toml"
+[skill]
+description  = "Search the tenant's document store with a natural language query and get a GPT-4o generated answer with sources."
+is_mcp       = true
+tags         = ["rag"]
+timeout_secs = 60
+```
+
+```python title="skills/search/models.py"
+from harnessapi import SkillInput, SkillOutput
+
+class Input(SkillInput):
+    query: str
+    top_k: int = 5
+    include_sources: bool = True
+
+class Output(SkillOutput):
+    answer: str
+    sources: list[dict]
+```
+
+The handler reads the tenant from a `ContextVar`, embeds the query, retrieves the
+top-k chunks from that tenant's collection, then streams a GPT-4o answer grounded in
+the retrieved context:
+
+```python title="skills/search/handler.py" {1-2,8-11}
+async def handle(input: Input):
+    tenant_id = tenant_id_var.get()
+    collection = get_collection(tenant_id)
+    # ...embed the query, query ChromaDB for top_k chunks...
+    stream = await client.chat.completions.create(
+        model=os.environ.get("OPENAI_MODEL", "gpt-4o"),
+        messages=[
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": f"Context:\n{context}\n\nQuestion: {input.query}"},
+        ],
+        stream=True,
+    )
+    async for chunk in stream:
+        delta = chunk.choices[0].delta.content
+        if delta:
+            yield delta
+```
+
+### list_docs — what's indexed for this tenant
+
+```toml title="skills/list_docs/skill.toml"
+[skill]
+description  = "List all documents indexed in the tenant's vector store, with chunk counts and metadata."
+is_mcp       = true
+tags         = ["rag"]
+timeout_secs = 30
+```
+
+```python title="skills/list_docs/models.py"
+from harnessapi import SkillInput, SkillOutput
+
+class Input(SkillInput):
+    pass
+
+class Output(SkillOutput):
+    tenant_id: str
+    document_count: int
+    total_chunks: int
+    documents: list[dict]
+```
+
+---
+
+## Wiring it up — `main.py`
+
+`main.py` builds the app with a `TenantBackend` (multi-tenancy), a middleware that
+copies the tenant id into a `ContextVar` for handlers, and an admin-key check that
+protects the admin MCP.
+
+```python title="main.py"
+import os
+from pathlib import Path
+from starlette.middleware.base import BaseHTTPMiddleware
+from starlette.requests import Request
+from starlette.responses import JSONResponse
+from harnessapi import HarnessAPI
+from harnessapi.multitenancy import TenantBackend, SQLiteStorageBackend, SandboxRegistry
+from skills.shared.context import tenant_id_var
+
+class TenantContextMiddleware(BaseHTTPMiddleware):
+    """Copies tenant_id from request.state into a ContextVar for skill handlers."""
+
+    async def dispatch(self, request: Request, call_next):
+        tid = getattr(request.state, "tenant_id", None) or "default"
+        token = tenant_id_var.set(tid)
+        try:
+            return await call_next(request)
+        finally:
+            tenant_id_var.reset(token)
+
+async def require_admin_key(request: Request, call_next):
+    key = request.headers.get("X-Admin-Key")
+    expected = os.environ.get("ADMIN_KEY", "dev-secret")
+    if key != expected:
+        return JSONResponse({"detail": "Forbidden — provide X-Admin-Key header"}, status_code=403)
+    return await call_next(request)
+
+backend = TenantBackend(
+    tenant_extractor=lambda req: req.headers.get("X-Tenant-ID") or "default",
+    storage=SQLiteStorageBackend(path="./variants.db"),
+    sandbox_registry=SandboxRegistry(),
+    sandbox_provider="local_subprocess",
+    auto_promote=False,
+)
+
+app = HarnessAPI(
+    skills_dir=Path(__file__).parent / "skills",
+    title="Agentic RAG",
+    description="Per-tenant document ingestion and semantic search with harnessapi + multi-tenancy",
+    tenant_backend=backend,
+    enable_admin_mcp=True,
+    admin_mcp_auth=require_admin_key,
+)
+
+app.add_middleware(TenantContextMiddleware)
+```
+
+  Skill handlers only receive the `Input` model — never the request. The
+  `TenantContextMiddleware` copies the tenant id (set on `request.state` by
+  harnessapi's `TenantMiddleware`) into a `ContextVar`, so handlers stay testable and
+  read `tenant_id_var.get()` instead of touching the request object.
+
+---
+
+## Run it
+
+1. **Scaffold the example** (or `cd` into it if you cloned the repo)
+
+   ```bash
+   uv tool install harnessapi      # recommended
+   harnessapi examples agentic-rag # scaffolds into ./agentic-rag/
+   cd agentic-rag
+   ```
+
+2. **Install dependencies**
+
+   ```bash
+   uv sync
+   ```
+
+3. **Set your OpenAI API key**
+
+   ```bash
+   cp .env.example .env
+   # edit .env → OPENAI_API_KEY=sk-...
+   # or: export OPENAI_API_KEY=sk-...
+   ```
+
+4. **Run**
+
+   ```bash
+   harnessapi run
+   # or: uvicorn main:app --reload
+   ```
+
+   On first run, sentence-transformers downloads the embedding model (~90 MB).
+   Subsequent starts are instant.
+
+   ```
+   INFO: Started server process
+   INFO: Discovered skills: ingest, list_docs, search
+   INFO: MCP endpoint:   http://localhost:8000/mcp
+   INFO: Admin MCP:      http://localhost:8000/admin-mcp
+   INFO: Swagger UI:     http://localhost:8000/docs
+   ```
+
+Endpoints exposed: `POST /skills/{ingest,search,list_docs}`, the MCP server at `/mcp`,
+the admin MCP at `/admin-mcp`, the tenant REST API under `/tenants/...`, plus
+`/docs` (Swagger UI) and `/openapi.json`.
+
+---
+
+## End-to-end walkthrough
+
+### 1. Ingest documents for tenant-1
+
+```bash
+curl -X POST http://localhost:8000/skills/ingest \
+  -H "Content-Type: application/json" \
+  -H "Accept: application/json" \
+  -H "X-Tenant-ID: tenant-1" \
+  -d '{
+    "text": "The Apollo program was a series of NASA missions from 1961 to 1972. Apollo 11 landed the first humans on the Moon on July 20, 1969. Neil Armstrong and Buzz Aldrin walked on the lunar surface while Michael Collins orbited above. Six Apollo missions successfully landed on the Moon.",
+    "doc_id": "apollo-history",
+    "metadata": {"title": "Apollo Program", "source": "history-book"}
+  }'
+```
+
+```json
+{"chunks": [
+  "Chunking document 'apollo-history'...",
+  "Created 2 chunks (size=500, overlap=50)",
+  "Embedding chunks...",
+  "Indexed chunks 1–2 / 2",
+  "Done. 2 chunks indexed for doc 'apollo-history' (tenant: tenant-1)"
+]}
+```
+
+### 2. Ingest a different document for tenant-2
+
+```bash
+curl -X POST http://localhost:8000/skills/ingest \
+  -H "Content-Type: application/json" \
+  -H "Accept: application/json" \
+  -H "X-Tenant-ID: tenant-2" \
+  -d '{
+    "text": "The Great Barrier Reef is the world'\''s largest coral reef system, stretching over 2,300 km off Queensland, Australia. It hosts over 1,500 species of fish and is a UNESCO World Heritage Site.",
+    "doc_id": "great-barrier-reef",
+    "metadata": {"title": "Great Barrier Reef", "source": "nature-encyclopedia"}
+  }'
+```
+
+### 3. Search tenant-1 — Apollo results only
+
+```bash
+curl -X POST http://localhost:8000/skills/search \
+  -H "Content-Type: application/json" \
+  -H "Accept: application/json" \
+  -H "X-Tenant-ID: tenant-1" \
+  -d '{"query": "When did humans first land on the Moon?", "top_k": 3}'
+```
+
+```json
+{"chunks": [
+  "Humans first landed on the Moon on **July 20, 1969**, during the Apollo 11 mission.",
+  " Neil Armstrong and Buzz Aldrin descended to the surface while Michael Collins orbited.\n\n",
+  "---\nSources (1 documents):\n",
+  "  • apollo-history (similarity: 0.921) — title: Apollo Program, source: history-book\n"
+]}
+```
+
+### 4. Verify tenant isolation
+
+```bash
+# tenant-2 has no Apollo data — honest "not in context" answer
+curl -X POST http://localhost:8000/skills/search \
+  -H "Content-Type: application/json" \
+  -H "Accept: application/json" \
+  -H "X-Tenant-ID: tenant-2" \
+  -d '{"query": "When did humans first land on the Moon?"}'
+```
+
+Response: `"The context does not contain information about Moon landings..."` — tenant-2
+only sees its reef document.
+
+### 5. List documents per tenant
+
+```bash
+curl -X POST http://localhost:8000/skills/list_docs \
+  -H "Content-Type: application/json" \
+  -H "Accept: application/json" \
+  -H "X-Tenant-ID: tenant-1" \
+  -d '{}'
+```
+
+```json
+{
+  "tenant_id": "tenant-1",
+  "document_count": 1,
+  "total_chunks": 2,
+  "documents": [
+    {"doc_id": "apollo-history", "chunk_count": 2, "title": "Apollo Program", "source": "history-book"}
+  ]
+}
+```
+
+### 6. Streaming with SSE (default)
+
+Drop the `Accept: application/json` header to receive live tokens:
+
+```bash
+curl -X POST http://localhost:8000/skills/search \
+  -H "Content-Type: application/json" \
+  -H "X-Tenant-ID: tenant-1" \
+  -d '{"query": "How many Moon landings were there?"}'
+```
+
+```
+event: chunk
+data: There were
+
+event: chunk
+data:  six successful Apollo Moon landings...
+
+event: done
+data:
+```
+
+---
+
+## Skills as MCP tools
+
+All three skills (`is_mcp = true`) are served at `/mcp`. Add the server to any MCP
+client — Claude Desktop, Claude Code, Cursor:
+
+```json
+{
+  "mcpServers": {
+    "agentic-rag": {
+      "url": "http://localhost:8000/mcp"
+    }
+  }
+}
+```
+
+`ingest`, `search`, and `list_docs` appear as tools. A typical agent flow:
+
+1. *"Ingest this document: [paste text]"* → calls `ingest`
+2. *"What does the document say about X?"* → calls `search`
+3. *"What documents have I ingested?"* → calls `list_docs`
+
+For single-user setups, requests use the `"default"` tenant. Pass an `X-Tenant-ID`
+header (if your client supports custom headers) to scope to a specific tenant.
+
+---
+
+## Admin MCP — per-tenant skill customization
+
+The admin MCP at `/admin-mcp` exposes tenant management as MCP **tools**, so an agent
+can clone a skill, push a modified handler, test it, and promote it — all without
+redeploying. The **same operations** are also available as a REST API under
+`/tenants/...` for scripts and CI.
+
+  The admin MCP can execute validated handler source on the server. It ships with **no
+  built-in authentication** — always protect `/admin-mcp` with auth middleware in
+  production. This example wires `admin_mcp_auth=require_admin_key`, which requires an
+  `X-Admin-Key` header (default `dev-secret`, override with the `ADMIN_KEY` env var).
+
+Add the admin server to your MCP client with the key:
+
+```json
+{
+  "mcpServers": {
+    "agentic-rag-admin": {
+      "url": "http://localhost:8000/admin-mcp",
+      "headers": {"X-Admin-Key": "dev-secret"}
+    }
+  }
+}
+```
+
+### Admin MCP tools
+
+| Tool | Arguments | Purpose | Sample prompt |
+|------|-----------|---------|---------------|
+| `clone_skill` | `tenant_id`, `skill_name` | Copy a base skill's handler source as a starting point | *"Clone the search skill for tenant-1 so I can customize it."* |
+| `customize_skill` | `tenant_id`, `skill_name`, `source_code`, `auto_promote=False`, `meta_overrides=None` | Submit modified handler source; validates and stores the variant | *"For tenant-1's search skill, use a friendlier system prompt and switch the model to gpt-4o-mini."* |
+| `promote_variant` | `tenant_id`, `skill_name`, `variant_id` | Make a variant the active handler for the tenant's skill | *"Promote tenant-1's new search variant to live."* |
+| `demote_variant` | `tenant_id`, `skill_name`, `variant_id` | Move a promoted variant back to sandbox status | *"Roll tenant-1's search back to the previous handler."* |
+| `preview_variant` | `tenant_id`, `skill_name`, `variant_id` | Route real tenant calls to the variant without full promotion | *"Preview the new search variant for tenant-1 on real traffic before I commit."* |
+| `run_variant` | `tenant_id`, `skill_name`, `variant_id`, `input_data` | Test a variant with input (sandbox if provisioned, else in-process) | *"Test tenant-1's search variant with the query 'Apollo mission details'."* |
+| `get_variant_source` | `tenant_id`, `skill_name`, `variant_id` | Return a variant's handler source | *"Show me the handler source for tenant-1's search variant."* |
+| `list_tenant_skills` | `tenant_id` | List all variants (sandbox + promoted) for a tenant | *"What skill variants does tenant-1 have right now?"* |
+| `provision_sandbox` | `tenant_id`, `skills_dir=""` | Provision an isolated subprocess sandbox; returns its endpoint URL | *"Spin up a sandbox for tenant-1."* |
+| `teardown_sandbox` | `tenant_id` | Tear down a tenant's sandbox | *"Shut down tenant-1's sandbox."* |
+| `sandbox_health` | `tenant_id` | Check a tenant's sandbox health | *"Is tenant-1's sandbox healthy?"* |
+| `push_to_sandbox` | `tenant_id`, `skill_name` | Push the promoted variant's handler source to the sandbox | *"Push tenant-1's promoted search handler into its sandbox."* |
+
+### Variant lifecycle via the REST tenant API
+
+The same flow with `curl`. Customize the `search` skill for `tenant-1` (e.g. a
+different system prompt), test it, then promote it — `tenant-2` is unaffected.
+
+1. **Clone** the base skill to create an editable variant
+
+   ```bash
+   curl -X POST http://localhost:8000/tenants/tenant-1/skills/search/clone \
+     -H "X-Admin-Key: dev-secret"
+   ```
+
+2. **Customize** — submit modified handler source. With `auto_promote: false` the
+   variant is stored but not yet live.
+
+   ```bash
+   curl -X POST http://localhost:8000/tenants/tenant-1/skills/search/customize \
+     -H "Content-Type: application/json" \
+     -H "X-Admin-Key: dev-secret" \
+     -d '{
+       "source_code": "async def handle(input):\n    ...customized handler...\n",
+       "auto_promote": false,
+       "meta_overrides": {}
+     }'
+   ```
+
+3. **Find the variant id**
+
+   ```bash
+   curl http://localhost:8000/tenants/tenant-1/skills/search/variants \
+     -H "X-Admin-Key: dev-secret"
+   ```
+
+4. **Test it** without affecting live traffic
+
+   ```bash
+   curl -X POST http://localhost:8000/tenants/tenant-1/skills/search/variants/<variant_id>/run \
+     -H "Content-Type: application/json" \
+     -H "X-Admin-Key: dev-secret" \
+     -d '{"query": "Apollo mission details"}'
+   ```
+
+5. **Preview** (route real `tenant-1` calls to the variant) or **promote** (make it the
+   active handler)
+
+   ```bash
+   curl -X POST http://localhost:8000/tenants/tenant-1/skills/search/variants/<variant_id>/promote \
+     -H "X-Admin-Key: dev-secret"
+   ```
+
+After promotion, every `tenant-1` call to `/skills/search` runs the customized handler;
+all other tenants keep the base handler. harnessapi resolves the handler for each
+request in this order: **sandbox → promoted variant → preview variant → base skill**.
+
+---
+
+## Per-tenant sandboxes
+
+Sandboxes run a tenant's handler in an **isolated subprocess** (the example sets
+`sandbox_provider="local_subprocess"`). They are managed through the **admin MCP tools**
+— there is no REST sandbox route. The typical flow:
+
+1. `provision_sandbox(tenant_id="tenant-1")` — start the subprocess, register its
+   endpoint.
+2. `push_to_sandbox(tenant_id="tenant-1", skill_name="search")` — push the promoted (or
+   base) handler source into it.
+3. `run_variant(...)` or a normal `/skills/search` call from `tenant-1` is now forwarded
+   to the sandbox.
+4. `sandbox_health(tenant_id="tenant-1")` — check it's reachable.
+5. `teardown_sandbox(tenant_id="tenant-1")` — shut it down.
+
+---
+
+## Tenant REST API reference
+
+All routes below are mounted under the `/tenants` prefix (require `X-Admin-Key` in this
+example):
+
+| Method | Route | Purpose |
+|--------|-------|---------|
+| `POST` | `/tenants/{tenant_id}/skills/{skill_name}/clone` | Clone a base skill |
+| `POST` | `/tenants/{tenant_id}/skills/{skill_name}/customize` | Store a customized handler (`source_code`) |
+| `POST` | `/tenants/{tenant_id}/skills/{skill_name}/variants/{variant_id}/promote` | Make the variant active |
+| `POST` | `/tenants/{tenant_id}/skills/{skill_name}/variants/{variant_id}/demote` | Return variant to sandbox status |
+| `POST` | `/tenants/{tenant_id}/skills/{skill_name}/variants/{variant_id}/preview` | Route real calls to the variant |
+| `POST` | `/tenants/{tenant_id}/skills/{skill_name}/variants/{variant_id}/run` | Test a variant with input |
+| `DELETE` | `/tenants/{tenant_id}/skills/{skill_name}/variants/{variant_id}` | Delete a variant |
+| `GET` | `/tenants/{tenant_id}/skills` | List all variants for a tenant |
+| `GET` | `/tenants/{tenant_id}/skills/{skill_name}/variants` | List variants for one skill |
+| `GET` | `/tenants/{tenant_id}/skills/{skill_name}/variants/{variant_id}/source` | Get a variant's source |
+
+---
+
+## Environment variables
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `OPENAI_API_KEY` | *(required)* | OpenAI API key for the `search` skill |
+| `OPENAI_MODEL` | `gpt-4o` | Model used for answer generation |
+| `CHROMA_PATH` | `./chroma_data` | Directory for ChromaDB persistence |
+| `ADMIN_KEY` | `dev-secret` | Key required for `/admin-mcp` and the `/tenants` API |
+
+  Re-ingesting the same `doc_id` is idempotent — the `ingest` handler deletes existing
+  chunks for that `doc_id` before upserting, so it replaces rather than duplicates.
+
+---
+
+## Multi-tenancy overview
+
+harnessapi has a built-in multi-tenancy layer. Add one parameter to `HarnessAPI(...)` and every skill automatically supports per-user variants: same input/output schema, different handler implementation, isolated routing.
+
+This is the foundation for **agent-driven skill customization** — users (or the agents acting on their behalf) submit modified handler code via HTTP, test it in a sandbox, and promote it when ready. No restarts, no deploys, no per-tenant route tables.
+
+---
+
+## How routing works
+
+Every `POST /skills/{name}` request goes through a four-step resolution:
+
+```
+POST /skills/greet   (X-Tenant-ID: user-a)
+         │
+         ▼
+   SkillRoute resolves:
+   1. Does user-a have a sandbox?           → forward entire request to sandbox process
+   2. Does user-a have a preview variant?   → run preview handler in-process
+   3. Does user-a have a promoted variant?  → run variant handler in-process
+   4. No variant, no sandbox               → use base skill handler
+```
+
+The route table never grows — dispatch is a single dict lookup per request, regardless of how many tenants or variants exist. Requests without a tenant header always reach the base skill.
+
+**What each step means:**
+
+- **Sandbox** — the tenant has a provisioned process (subprocess, Docker, Kubernetes). The request is proxied verbatim. The sandbox runs whatever handler was last pushed to it.
+- **Preview** — a variant has been set to `preview` status. It routes real tenant traffic without fully replacing the promoted handler. Useful for gradual rollouts and canary testing.
+- **Promoted** — the tenant's active variant. Set explicitly by an operator or agent after sandbox testing.
+- **Base** — the shared, unmodified skill handler. Used when no tenant context applies.
+
+---
+
+## Drop-in setup
+
+**Before (single-tenant):**
+```python
+app = HarnessAPI(skills_dir="./skills")
+```
+
+**After (multi-tenant — two lines added):**
+```python
+from harnessapi import HarnessAPI
+from harnessapi.multitenancy import TenantBackend, SQLiteStorageBackend
+
+backend = TenantBackend(
+    tenant_extractor=lambda req: req.headers.get("X-Tenant-ID"),
+    storage=SQLiteStorageBackend(path="./variants.db"),
+)
+
+app = HarnessAPI(skills_dir="./skills", tenant_backend=backend)
+```
+
+All existing skill endpoints (`POST /skills/{name}`) continue to work unchanged. harnessapi adds a `/tenants/*` management API automatically.
+
+---
+
+## Core invariants
+
+| Invariant | Why it matters |
+|---|---|
+| Schema never changes per tenant | `input_model` and `output_model` are always from the base skill. Agents change the handler only. All callers stay schema-compatible. |
+| Variants must be explicitly promoted | Sandbox → promoted is a deliberate step. Agents can test before going live. |
+| At most one promoted variant per (tenant, skill) | Promoting a new variant automatically demotes the previous one. No stale routing. |
+| MCP tools always use base skills | MCP has no tenant context. The `/mcp` endpoint is tenant-agnostic. |
+
+---
+
+## Tenant extraction
+
+The `tenant_extractor` is any callable that reads a request and returns a `str | None`. It can be sync or async:
+
+```python
+# From a header (most common)
+tenant_extractor=lambda req: req.headers.get("X-Tenant-ID")
+
+# From a JWT sub-claim (async)
+async def from_jwt(req):
+    token = req.headers.get("Authorization", "").removeprefix("Bearer ")
+    return decode_jwt(token).get("sub")
+
+# From a query parameter
+tenant_extractor=lambda req: req.query_params.get("tenant")
+
+# From a path segment (useful with API gateways)
+tenant_extractor=lambda req: req.path_params.get("tenant_id")
+```
+
+When the extractor returns `None`, harnessapi routes to the base skill — no variant lookup.
+
+---
+
+## What's next
+
+| Topic | Page |
+|---|---|
+| Clone, customize, test, promote a variant | [Variant lifecycle](/harnessapi/multi-tenancy/variants) |
+| Route real traffic before hard-promoting | [Preview & staging](/harnessapi/multi-tenancy/preview) |
+| True process isolation per tenant | [Per-user sandboxes](/harnessapi/multi-tenancy/sandboxes) |
+| Persist variants across restarts | [Storage backends](/harnessapi/multi-tenancy/storage) |
+| Agent-native management via MCP tools | [Admin MCP server](/harnessapi/multi-tenancy/admin-mcp) |
+| All endpoints and config params | [API reference](/harnessapi/multi-tenancy/api-reference) |
+
+---
+
+## Variant lifecycle
+
+A **variant** is a modified version of a base skill handler that belongs to a specific tenant. Variants share the same input/output schema as the base skill — only the handler implementation changes.
+
+Every variant moves through a defined lifecycle before it routes production traffic:
+
+```
+clone ──► customize ──► run (test) ──► preview (optional) ──► promote
+   │                                                               │
+   └─────────────────── sandbox status ───────────────────────────┘
+                                                          promoted status
+```
+
+---
+
+## Variant statuses
+
+| Status | What it means | Routing |
+|---|---|---|
+| `sandbox` | Created but not yet active | Only reachable via `/run` — never routes real calls |
+| `preview` | Active for real traffic as a canary | Routes real tenant calls; coexists with promoted variant |
+| `promoted` | Fully active | Routes all real tenant calls (unless a preview is set) |
+
+At most **one promoted** and **one preview** variant can be active per (tenant, skill) at any time.
+
+---
+
+## Step 1 — Clone the base skill
+
+```bash
+curl -X POST http://localhost:8000/tenants/user-a/skills/greet/clone
+```
+
+```json
+{
+  "variant_id": "3f2a1...",
+  "tenant_id": "user-a",
+  "base_skill_name": "greet",
+  "status": "sandbox",
+  "source_code": "async def handle(input: Input) -> Output:\n    return Output(message=f'Hello, {input.name}!')"
+}
+```
+
+The response includes the base handler source as a starting point. The agent or user modifies it locally before submitting.
+
+---
+
+## Step 2 — Submit customized source
+
+```bash
+curl -X POST http://localhost:8000/tenants/user-a/skills/greet/customize \
+  -H "Content-Type: application/json" \
+  -d '{
+    "source_code": "async def handle(input: Input) -> Output:\n    return Output(message=f\"Howdy, {input.name}!\")"
+  }'
+```
+
+harnessapi validates the source (AST checks — no dangerous imports, correct function signature) before accepting it. Invalid code returns a `422` with a list of violations.
+
+---
+
+## Step 3 — Test in sandbox
+
+```bash
+curl -X POST http://localhost:8000/tenants/user-a/skills/greet/variants/3f2a1.../run \
+  -H "Content-Type: application/json" \
+  -d '{"name": "Alice"}'
+```
+
+```json
+{"message": "Howdy, Alice!"}
+```
 
 The variant runs with a configurable timeout. Errors are returned as structured JSON — the variant is never live for production traffic at this stage. If the tenant has a sandbox provisioned, the run request is forwarded there; otherwise it executes in-process.
 
-### Step 4 — Promote
+---
 
-    curl -X POST http://localhost:8000/tenants/user-a/skills/greet/variants/3f2a1.../promote
+## Step 4 — Promote
 
-All subsequent POST /skills/greet requests with X-Tenant-ID: user-a now use the promoted handler. If a different variant was previously promoted, it is automatically moved back to sandbox status.
+```bash
+curl -X POST http://localhost:8000/tenants/user-a/skills/greet/variants/3f2a1.../promote
+```
 
-### Auto-promote shortcut
+All subsequent `POST /skills/greet` requests with `X-Tenant-ID: user-a` now use the promoted handler. Other tenants and calls without a tenant header still use the base skill.
 
-    curl -X POST .../customize -d '{"source_code": "...", "auto_promote": true}'
-    # or set auto_promote=True on TenantBackend
-
-### Handler source constraints
-
-AST validation blocks naive mistakes but is NOT a security boundary. True isolation requires a SandboxProvider.
-
-Rules:
-- No blocked imports: os, subprocess, socket, sys, importlib, builtins (configurable)
-- No dangerous builtins: exec, eval, compile, open, __import__
-- Exactly one top-level async function named handle
-- One positional parameter: handle(input)
-
-Customize the blocklist:
-
-    backend = TenantBackend(..., sandbox_import_blocklist=["os", "subprocess", "socket"])
-
-### Demoting and deleting
-
-    # Demote to sandbox
-    curl -X POST .../variants/3f2a1.../demote
-
-    # Delete entirely
-    curl -X DELETE .../variants/3f2a1...
+If a different variant was previously promoted, it is automatically moved back to `sandbox` status.
 
 ---
 
-## Preview & Staging
+## Optional: Preview before promoting
 
-Preview is a variant status between sandbox and promoted. A preview variant routes real tenant traffic — giving you live exposure without committing to a full promotion. If something goes wrong, you demote it and the previously promoted variant (if any) immediately resumes serving traffic.
-
-### How preview coexists with promoted
-
-At most one preview and one promoted variant can be active per (tenant, skill) simultaneously. Preview takes routing priority: preview → promoted → base.
-
-Setting a preview does NOT demote any existing promoted variant. Both coexist — the preview is simply checked first.
-
-### Setting a variant to preview
-
-    curl -X POST http://localhost:8000/tenants/user-a/skills/greet/variants/3f2a1.../preview
-    # → {"variant_id": "3f2a1...", "status": "preview", ...}
-
-Real calls to POST /skills/greet with X-Tenant-ID: user-a now hit the preview handler immediately.
-
-### Displacement rule
-
-Setting a new preview when one already exists moves the previous preview back to sandbox status automatically. Only one preview is ever active at a time.
-
-### Typical staging flow
-
-1. clone → create sandbox variant
-2. customize → submit modified source
-3. run → test in isolation, no real traffic
-4. preview → real tenant traffic hits the variant
-5. promote → commit as permanent active handler
-
-### Stopping a preview
-
-- Demote it: curl -X POST .../demote
-- Promote a different variant: displaces the preview automatically
-- Promote the preview itself: moves it from preview to promoted
-
-### Preview via Admin MCP
-
-When enable_admin_mcp=True, the preview_variant MCP tool is available. Args: tenant_id, skill_name, variant_id.
+Between step 3 and step 4, you can set the variant to `preview` status. This routes real tenant calls through it while leaving any existing promoted variant in place. See [Preview & staging](/harnessapi/multi-tenancy/preview) for the full pattern.
 
 ---
 
-## Per-User Sandboxes
+## Auto-promote shortcut
 
-By default, variant handlers execute in the main server process. Per-user sandboxes fix this: each tenant gets their own isolated process (subprocess, Docker container, or Kubernetes pod). Skill calls for that tenant are proxied to the sandbox over HTTP instead of running in-process.
+Skip the explicit promote step by passing `auto_promote: true` on customize:
 
-### When to use sandboxes
+```bash
+curl -X POST http://localhost:8000/tenants/user-a/skills/greet/customize \
+  -d '{"source_code": "...", "auto_promote": true}'
+```
 
-- Trusted users, internal tools: In-process promoted variants (no sandbox needed)
-- Untrusted or user-submitted code: Sandbox — provides process isolation
-- Strict resource limits per tenant: Sandbox — apply CPU/memory limits at container/pod level
-- Compliance or audit requirements: Sandbox — each tenant's execution is fully isolated
+Or set it as the default on the backend:
+
+```python
+backend = TenantBackend(
+    ...,
+    auto_promote=True,
+)
+```
+
+---
+
+## Handler source constraints
+
+> **Security note:** AST validation blocks naive mistakes and obvious injection attempts. It is **not** a security boundary — determined code can bypass it (e.g. via `getattr`, `__builtins__`, or lambda tricks). True isolation requires a `SandboxProvider` (subprocess/Docker/Kubernetes). Do not rely on AST validation alone for untrusted input.
+
+Submitted handler source must pass static AST validation before it is accepted:
+
+| Rule | What it blocks |
+|---|---|
+| No blocked imports | `os`, `subprocess`, `socket`, `sys`, `importlib`, `builtins` (configurable) |
+| No dangerous builtins | `exec`, `eval`, `compile`, `open`, `__import__` |
+| Exactly one top-level async function | Must be named `handle` |
+| One positional parameter | `handle(input)` |
+
+```python
+# Valid — non-streaming
+async def handle(input: Input) -> Output:
+    return Output(message=input.name.upper())
+
+# Valid — streaming
+async def handle(input: Input):
+    for word in input.text.split():
+        yield word
+
+# Rejected — blocked import
+import os
+async def handle(input): ...
+
+# Rejected — wrong function name
+async def process(input): ...
+```
+
+Customize the blocklist per deployment:
+
+```python
+backend = TenantBackend(
+    ...,
+    sandbox_import_blocklist=["os", "subprocess", "socket"],  # narrow the list if needed
+)
+```
+
+---
+
+## Demoting and deleting
+
+Move a promoted variant back to sandbox status:
+
+```bash
+curl -X POST http://localhost:8000/tenants/user-a/skills/greet/variants/3f2a1.../demote
+```
+
+Delete a variant entirely:
+
+```bash
+curl -X DELETE http://localhost:8000/tenants/user-a/skills/greet/variants/3f2a1...
+```
+
+---
+
+## See also
+
+- [Preview & staging](/harnessapi/multi-tenancy/preview) — route real traffic without committing to promotion
+- [Per-user sandboxes](/harnessapi/multi-tenancy/sandboxes) — true process isolation for variant execution
+- [API reference](/harnessapi/multi-tenancy/api-reference) — full endpoint list
+
+---
+
+## Preview & staging
+
+**Preview** is a variant status between `sandbox` and `promoted`. A preview variant routes real tenant traffic — giving you live exposure without committing to a full promotion. If something goes wrong, you demote it and the previously promoted variant (if any) immediately resumes serving traffic.
+
+This is the recommended staging step for any significant handler change.
+
+---
+
+## How preview coexists with promoted
+
+At most **one preview** and **one promoted** variant can be active per (tenant, skill) simultaneously. Preview takes routing priority:
+
+```
+Request (X-Tenant-ID: user-a)
+         │
+         ▼
+   Is there a preview variant?     YES → run preview handler
+         │ NO
+         ▼
+   Is there a promoted variant?    YES → run promoted handler
+         │ NO
+         ▼
+   Use base skill handler
+```
+
+Setting a preview does **not** demote any existing promoted variant. Both coexist — the preview is simply checked first.
+
+---
+
+## Setting a variant to preview
+
+```bash
+curl -X POST http://localhost:8000/tenants/user-a/skills/greet/variants/3f2a1.../preview
+```
+
+```json
+{
+  "variant_id": "3f2a1...",
+  "tenant_id": "user-a",
+  "base_skill_name": "greet",
+  "status": "preview"
+}
+```
+
+Real calls to `POST /skills/greet` with `X-Tenant-ID: user-a` now hit the preview handler immediately.
+
+---
+
+## Displacement rule
+
+Setting a **new** preview when one already exists for the same (tenant, skill) moves the previous preview back to `sandbox` status automatically. Only one preview is ever active at a time.
+
+```bash
+# Variant A is preview
+curl -X POST .../variants/variant-a/preview   # variant-a → preview
+
+# Set variant B as preview — variant-a moves back to sandbox
+curl -X POST .../variants/variant-b/preview   # variant-b → preview, variant-a → sandbox
+```
+
+---
+
+## Typical staging flow
+
+```
+1. clone       → create sandbox variant from base handler
+2. customize   → submit modified source (validated)
+3. run         → test in isolation, no real traffic
+4. preview     → real tenant traffic hits the variant (staging)
+5. promote     → commit as permanent active handler
+```
+
+Steps 1–3 are always safe (no live traffic). Step 4 exposes the variant to real traffic with an easy rollback path. Step 5 commits.
+
+---
+
+## Stopping a preview
+
+**Demote it** (moves back to sandbox, promoted variant — if any — resumes):
+
+```bash
+curl -X POST http://localhost:8000/tenants/user-a/skills/greet/variants/3f2a1.../demote
+```
+
+**Promote a different variant** (clears the preview slot, new variant becomes promoted):
+
+```bash
+curl -X POST http://localhost:8000/tenants/user-a/skills/greet/variants/other-id.../promote
+```
+
+**Promote the preview itself** (moves it from preview to promoted):
+
+```bash
+curl -X POST http://localhost:8000/tenants/user-a/skills/greet/variants/3f2a1.../promote
+```
+
+---
+
+## Preview via Admin MCP
+
+When the admin MCP server is enabled, the `preview_variant` tool is available directly from Claude Desktop or Claude Code:
+
+```
+Tool: preview_variant
+Args: { "tenant_id": "user-a", "skill_name": "greet", "variant_id": "3f2a1..." }
+```
+
+See [Admin MCP server](/harnessapi/multi-tenancy/admin-mcp) for setup.
+
+---
+
+## See also
+
+- [Variant lifecycle](/harnessapi/multi-tenancy/variants) — full clone → customize → test → promote workflow
+- [Admin MCP server](/harnessapi/multi-tenancy/admin-mcp) — manage variants as MCP tools
+- [API reference](/harnessapi/multi-tenancy/api-reference) — preview endpoint details
+
+---
+
+## Per-user sandboxes
+
+By default, variant handlers execute in the main server process. This is fast and simple but means all tenants share a process boundary — a misbehaving handler can affect others.
+
+**Per-user sandboxes** fix this: each tenant gets their own isolated process (subprocess, Docker container, or Kubernetes pod). Skill calls for that tenant are proxied to the sandbox over HTTP instead of running in-process.
+
+---
+
+## When to use sandboxes
+
+| Use case | Approach |
+|---|---|
+| Trusted users, internal tools | In-process promoted variants (no sandbox needed) |
+| Untrusted or user-submitted code | Sandbox — provides process isolation |
+| Strict resource limits per tenant | Sandbox — apply CPU/memory limits at the container/pod level |
+| Compliance or audit requirements | Sandbox — each tenant's execution is fully isolated |
 
 AST validation alone is not a security boundary. If users can submit arbitrary handler code, provision a sandbox.
 
-### Setup
+---
 
-    from harnessapi.multitenancy import TenantBackend, SQLiteStorageBackend, SandboxRegistry
+## Setup
 
-    backend = TenantBackend(
-        tenant_extractor=lambda req: req.headers.get("X-Tenant-ID"),
-        storage=SQLiteStorageBackend(path="./variants.db"),
-        sandbox_registry=SandboxRegistry(),
-        sandbox_provider="local_subprocess",   # or "docker" or "kubernetes"
-    )
+Add `sandbox_registry` and `sandbox_provider` to `TenantBackend`:
 
-### Sandbox workflow
+```python
+from harnessapi.multitenancy import TenantBackend, SQLiteStorageBackend, SandboxRegistry
 
-1. Provision: POST /tenants/user-a/sandbox/provision with {"skills_dir": "./skills"}
-   → Returns endpoint_url, sandbox_type, pid, status: "running"
+backend = TenantBackend(
+    tenant_extractor=lambda req: req.headers.get("X-Tenant-ID"),
+    storage=SQLiteStorageBackend(path="./variants.db"),
+    sandbox_registry=SandboxRegistry(),
+    sandbox_provider="local_subprocess",   # or "docker" or "kubernetes"
+)
 
-2. Push variant: POST /tenants/user-a/skills/greet/push-to-sandbox
-   → Sends promoted variant source to sandbox. Skipped if source unchanged (deduplication).
+app = HarnessAPI(skills_dir="./skills", tenant_backend=backend)
+```
 
-3. Call skill: POST /skills/greet with X-Tenant-ID: user-a
-   → Main server detects sandbox and proxies request transparently.
-
-4. Health check: GET /tenants/user-a/sandbox/health
-   → Returns status, endpoint_url, last_seen.
-
-5. Tear down: DELETE /tenants/user-a/sandbox
-   → Stops sandbox process, removes registration. Falls back to in-process handler.
-
-### Sandbox providers
-
-- "local_subprocess": Spawns a Python subprocess on a random local port. No extra deps.
-- "docker": Runs a Docker container. Requires harnessapi[docker].
-- "kubernetes": Creates a Pod + ClusterIP Service. Requires harnessapi[kubernetes].
-
-### Custom SandboxProvider protocol
-
-    class SandboxProvider(Protocol):
-        sandbox_type: str
-        async def provision(self, tenant_id: str, skills_dir: str, **kwargs) -> SandboxConnection: ...
-        async def teardown(self, conn: SandboxConnection) -> None: ...
-
-SandboxConnection dataclass fields: tenant_id, endpoint_url, sandbox_type, pid, auth_token, metadata, created_at, last_seen.
-
-### Push deduplication
-
-push-to-sandbox tracks the last pushed handler source per skill in memory. If unchanged since the last push, the HTTP call is skipped. The cache resets on server restart — the first push after a restart always sends.
-
-### Provider-specific configuration
-
-    backend = TenantBackend(
-        ...,
-        sandbox_provider="docker",
-        sandbox_provider_config={"image": "my-org/harnessapi-sandbox:latest", "memory_limit": "512m"},
-    )
+`SandboxRegistry` is the in-memory map from tenant IDs to running sandbox connections. It is created fresh on startup; persistent sandbox state (endpoint URL, pid, etc.) is stored in the storage backend.
 
 ---
 
-## Storage Backends
+## Sandbox workflow
 
-Variants created and promoted during a server session need to survive restarts. harnessapi uses a pluggable storage backend. On startup, promoted and preview variants are loaded from storage, recompiled, and registered — routing resumes where it left off.
+### 1. Provision a sandbox
 
-### Backends
+```bash
+curl -X POST http://localhost:8000/tenants/user-a/sandbox/provision \
+  -H "Content-Type: application/json" \
+  -d '{"skills_dir": "./skills"}'
+```
 
-- InProcessStorageBackend: Memory only. Variants disappear on process exit. Default. Good for dev/test.
-- LocalFileStorageBackend: One JSON file per variant in a directory. No DB required. Single-worker only.
-- SQLiteStorageBackend: Persistent SQLite. Also persists sandbox connection metadata. Single-worker only.
-- Custom: Implement the 9-method protocol (structural, no base class required). Good for Postgres, Redis, etc.
+```json
+{
+  "tenant_id": "user-a",
+  "endpoint_url": "http://127.0.0.1:43721",
+  "sandbox_type": "local_subprocess",
+  "pid": 9182,
+  "status": "running"
+}
+```
 
-### InProcessStorageBackend
+The sandbox starts a fresh harnessapi server with the base skills loaded. It is reachable only from the main server — never directly exposed.
 
-    from harnessapi.multitenancy import TenantBackend, InProcessStorageBackend
-    backend = TenantBackend(..., storage=InProcessStorageBackend())  # or omit — it's the default
+### 2. Push a variant to the sandbox
 
-### LocalFileStorageBackend
+After promoting a variant, push its handler source to the sandbox so the sandbox runs the customized version:
 
-    from harnessapi.multitenancy import LocalFileStorageBackend
-    storage = LocalFileStorageBackend(variants_dir="./variants")
-    # Each variant stored as ./variants/{variant_id}.json
+```bash
+curl -X POST http://localhost:8000/tenants/user-a/skills/greet/push-to-sandbox
+```
 
-### SQLiteStorageBackend
+harnessapi only sends the HTTP request if the handler source has changed since the last push (source-level deduplication). Repeated calls are cheap.
 
-    from harnessapi.multitenancy import SQLiteStorageBackend
-    storage = SQLiteStorageBackend(path="./variants.db")
-    # Tables: skill_variant, sandbox_connection. Created automatically.
+### 3. Call the skill — automatically forwarded
 
-### Custom backend protocol (9 methods, all async)
+```bash
+curl -X POST http://localhost:8000/skills/greet \
+  -H "X-Tenant-ID: user-a" \
+  -H "Content-Type: application/json" \
+  -d '{"name": "Alice"}'
+```
 
-    class MyPostgresBackend:
-        async def save_variant(self, variant) -> None: ...
-        async def load_promoted_variants(self) -> list: ...
-        async def load_preview_variants(self) -> list: ...
-        async def load_sandbox_variant(self, variant_id: str): ...
-        async def delete_variant(self, variant_id: str) -> None: ...
-        async def promote_variant(self, variant_id: str) -> None: ...
-        async def demote_variant(self, variant_id: str) -> None: ...
-        async def preview_variant(self, variant_id: str) -> None: ...
-        async def list_variants(self, tenant_id: str) -> list: ...
+The main server detects that `user-a` has a sandbox and proxies the request. The response comes back through the main server — callers see no difference.
 
-### Startup restore behavior
+### 4. Check sandbox health
 
-On startup harnessapi calls load_promoted_variants() and load_preview_variants(). For each returned variant it compiles the stored handler source and registers it in the TenantSkillRegistry. A server restart is transparent to callers — active routing resumes immediately.
+```bash
+curl http://localhost:8000/tenants/user-a/sandbox/health
+```
 
----
+```json
+{
+  "status": "healthy",
+  "endpoint_url": "http://127.0.0.1:43721",
+  "last_seen": "2026-05-22T19:00:00Z"
+}
+```
 
-## Admin MCP Server
+### 5. Tear down
 
-The admin MCP server exposes the entire multi-tenancy management API as Model Context Protocol tools. Instead of calling REST endpoints directly, agents can manage skill variants natively through Claude Desktop, Claude Code, or any MCP client.
+```bash
+curl -X DELETE http://localhost:8000/tenants/user-a/sandbox
+```
 
-### Enabling
-
-    app = HarnessAPI(
-        skills_dir="./skills",
-        tenant_backend=backend,
-        enable_admin_mcp=True,   # mounts /admin-mcp
-    )
-
-### Connecting
-
-    {"mcpServers": {"harnessapi-admin": {"url": "http://localhost:8000/admin-mcp"}}}
-
-### Available tools (12 total)
-
-- clone_skill: Copy base handler source as a sandbox variant
-- customize_skill: Submit modified handler source — validated before storing
-- run_variant: Test a variant with input — forwards to sandbox if provisioned, otherwise runs in-process
-- preview_variant: Route real tenant traffic through a variant without full promotion
-- promote_variant: Make a variant the active handler for a tenant (demotes previous promoted)
-- demote_variant: Move a promoted or preview variant back to sandbox
-- get_variant_source: Read the current handler source for any variant
-- list_tenant_skills: List all variants for a tenant across all skills
-- provision_sandbox: Boot a per-tenant sandbox process
-- teardown_sandbox: Shut down a tenant's sandbox
-- sandbox_health: Check if a sandbox is reachable and responding
-- push_to_sandbox: Deploy the promoted variant's handler source to the sandbox
-
-### Agent workflow (MCP tools only)
-
-1. clone_skill → variant_id returned (sandbox status)
-2. customize_skill → submit modified source, validated + stored
-3. run_variant → test with sample input, verify output
-4. preview_variant → variant routes real traffic for the tenant (optional staging)
-5. promote_variant → variant becomes permanent active handler
-6. push_to_sandbox → sync promoted handler to sandbox
-
-### Protecting /admin-mcp
-
-The admin MCP server has no authentication by default. You MUST protect it before enabling in production.
-
-Pass an admin_mcp_auth callable to HarnessAPI. Signature: async (request, call_next) -> Response. Return a 4xx to reject; call await call_next(request) to allow.
-
-    import os
-    from starlette.responses import JSONResponse
-
-    async def require_api_key(request, call_next):
-        if request.headers.get("X-Admin-Key") != os.environ["ADMIN_KEY"]:
-            return JSONResponse({"detail": "Forbidden"}, status_code=403)
-        return await call_next(request)
-
-    app = HarnessAPI(
-        skills_dir="./skills",
-        tenant_backend=backend,
-        enable_admin_mcp=True,
-        admin_mcp_auth=require_api_key,
-    )
-
-To pass the auth header from Claude Desktop:
-
-    {"mcpServers": {"harnessapi-admin": {"url": "http://localhost:8000/admin-mcp", "headers": {"X-Admin-Key": "secret"}}}}
-
-### /mcp vs /admin-mcp
-
-- /mcp: Exposes skills as tools for end users. No tenant context. Always enabled.
-- /admin-mcp: Exposes management API for operators/agents. Fully tenant-aware. Requires enable_admin_mcp=True.
+Stops the sandbox process and removes its registration. Subsequent calls fall back to in-process promoted or base handler.
 
 ---
 
-## Multi-tenancy API Reference
+## Sandbox providers
 
-### Variant lifecycle endpoints
+| Provider string | What it does | Extra deps |
+|---|---|---|
+| `"local_subprocess"` | Spawns a Python subprocess on a random local port | none |
+| `"docker"` | Runs a Docker container | `pip install harnessapi[docker]` |
+| `"kubernetes"` | Creates a Pod + ClusterIP Service | `pip install harnessapi[kubernetes]` |
 
-- POST /tenants/{tenant_id}/skills/{name}/clone — Copy base handler source as a new sandbox variant
-- POST /tenants/{tenant_id}/skills/{name}/customize — Submit handler source: validate, store, optionally promote
-- POST /tenants/{tenant_id}/skills/{name}/variants/{id}/preview — Set as preview — routes real traffic, coexists with promoted
-- POST /tenants/{tenant_id}/skills/{name}/variants/{id}/promote — Make variant active for tenant (demotes previous promoted)
-- POST /tenants/{tenant_id}/skills/{name}/variants/{id}/demote — Move back to sandbox status
-- POST /tenants/{tenant_id}/skills/{name}/variants/{id}/run — Test with input — forwards to sandbox if provisioned, else in-process
-- DELETE /tenants/{tenant_id}/skills/{name}/variants/{id} — Delete variant permanently
+### Custom provider
 
-### Introspection endpoints
+Pass any object that implements the `SandboxProvider` protocol:
 
-- GET /tenants/{tenant_id}/skills — List all variants for a tenant (all skills)
-- GET /tenants/{tenant_id}/skills/{name}/variants — List variants for a specific skill
-- GET /tenants/{tenant_id}/skills/{name}/variants/{id}/source — Get handler source for a variant
+```python
+from harnessapi.multitenancy import SandboxRegistry
 
-### Sandbox lifecycle endpoints (only when sandbox_registry is set)
+backend = TenantBackend(
+    ...,
+    sandbox_registry=SandboxRegistry(),
+    sandbox_provider=MyCustomProvider(),
+)
+```
 
-- POST /tenants/{tenant_id}/sandbox/provision — Boot a sandbox process
-- DELETE /tenants/{tenant_id}/sandbox — Tear down the tenant's sandbox
-- GET /tenants/{tenant_id}/sandbox/health — Health check: status and last_seen timestamp
-- POST /tenants/{tenant_id}/skills/{name}/push-to-sandbox — Push promoted variant handler source to sandbox
+The protocol:
 
-### customize request body
+```python
+class SandboxProvider(Protocol):
+    sandbox_type: str
 
-    {"source_code": "async def handle(input: Input) -> Output: ...", "auto_promote": false}
+    async def provision(
+        self,
+        tenant_id: str,
+        skills_dir: str,
+        **kwargs,
+    ) -> SandboxConnection: ...
 
-source_code is required. auto_promote defaults to false.
+    async def teardown(self, conn: SandboxConnection) -> None: ...
+```
 
-### TenantBackend configuration
-
-    TenantBackend(
-        tenant_extractor=lambda req: req.headers.get("X-Tenant-ID"),  # required
-        storage=SQLiteStorageBackend(path="./variants.db"),           # default: InProcessStorageBackend
-        sandbox_import_blocklist=["os", "subprocess", "socket", "sys", "importlib", "builtins"],
-        auto_promote=False,
-        max_variants_per_tenant_per_skill=10,   # 409 when exceeded
-        sandbox_run_timeout_secs=10.0,
-        sandbox_registry=SandboxRegistry(),     # optional — enables per-tenant sandboxes
-        sandbox_provider="local_subprocess",    # or "docker", "kubernetes", or custom instance
-        sandbox_provider_config={},             # passed as kwargs to provider.provision()
-    )
-
-### HarnessAPI multi-tenancy parameters
-
-    app = HarnessAPI(
-        skills_dir="./skills",
-        tenant_backend=backend,           # enables multi-tenancy
-        enable_admin_mcp=True,            # mounts /admin-mcp
-        admin_mcp_auth=require_api_key,   # protects /admin-mcp
-    )
-
-### Complete setup example
-
-    import os
-    from pathlib import Path
-    from starlette.responses import JSONResponse
-    from harnessapi import HarnessAPI
-    from harnessapi.multitenancy import TenantBackend, SQLiteStorageBackend, SandboxRegistry
-
-    async def require_api_key(request, call_next):
-        if request.headers.get("X-Admin-Key") != os.environ["ADMIN_KEY"]:
-            return JSONResponse({"detail": "Forbidden"}, status_code=403)
-        return await call_next(request)
-
-    backend = TenantBackend(
-        tenant_extractor=lambda req: req.headers.get("X-Tenant-ID"),
-        storage=SQLiteStorageBackend(path="./variants.db"),
-        sandbox_registry=SandboxRegistry(),
-        sandbox_provider="local_subprocess",
-        auto_promote=False,
-        max_variants_per_tenant_per_skill=5,
-        sandbox_run_timeout_secs=10.0,
-    )
-
-    app = HarnessAPI(
-        skills_dir=Path(__file__).parent / "skills",
-        tenant_backend=backend,
-        enable_admin_mcp=True,
-        admin_mcp_auth=require_api_key,
-    )
+`SandboxConnection` is a dataclass with `tenant_id`, `endpoint_url`, `sandbox_type`, `pid`, `auth_token`, `metadata`, `created_at`, and `last_seen`.
 
 ---
 
-## CLI Reference
+## Push deduplication
 
-### harnessapi init
+`push-to-sandbox` tracks the last pushed handler source per skill in memory on the `SandboxConnection` object. If the source has not changed since the last successful push, the HTTP call is skipped entirely. This makes it safe to call `push-to-sandbox` eagerly without worrying about redundant network traffic.
 
-Scaffolds a new harnessapi project or adds the harnessapi layer to existing skill folders.
-
-    harnessapi init my-project                           # new project with greet skill
-    harnessapi init --skill .agents/skills/summarize     # add API layer to existing skill
-    harnessapi init --skills-dir .agents/skills          # convert whole directory
-    harnessapi init --function utils/compute.py --output skills  # wrap a Python function
-
-### harnessapi run
-
-Starts the harnessapi development server using uvicorn with auto-reload.
-
-    harnessapi run                    # auto-detects main:app, port 8000
-    harnessapi run --port 8080        # custom port
-    harnessapi run --host 0.0.0.0     # expose to network
-    harnessapi run --no-reload        # disable auto-reload
-    harnessapi run --app mymodule:app # explicit app
-
-URLs when running:
-- POST http://localhost:8000/skills/{name} — skill endpoints
-- GET  http://localhost:8000/docs          — Swagger UI
-- GET  http://localhost:8000/redoc         — ReDoc
--      http://localhost:8000/mcp           — MCP server
--      http://localhost:8000/admin-mcp     — Admin MCP server (if enabled)
-- GET  http://localhost:8000/openapi.json  — OpenAPI schema
+The cache is in-memory only — it resets if the main server restarts. The first push after a restart will always send.
 
 ---
 
-## Convert an agentskills.io Skill
+## Provider-specific configuration
 
-harnessapi is a superset of the agentskills.io standard. Any folder with a SKILL.md is a valid agentskills.io skill. Adding handler.py and models.py makes it a full harnessapi skill.
+Pass extra kwargs to `provision()` via `sandbox_provider_config`:
 
-    harnessapi init --skill .agents/skills/summarize
-    harnessapi init --skills-dir .agents/skills
-
-Existing files are never overwritten. SKILL.md is never modified. All agentskills.io tooling continues to work.
-
-Metadata priority: skill.toml > SKILL.md frontmatter > folder name / docstring.
+```python
+backend = TenantBackend(
+    ...,
+    sandbox_provider="docker",
+    sandbox_provider_config={
+        "image": "my-org/harnessapi-sandbox:latest",
+        "memory_limit": "512m",
+        "cpu_period": 100000,
+        "cpu_quota": 50000,
+    },
+)
+```
 
 ---
 
-## Deploy to Production
+## See also
 
-harnessapi is a standard ASGI app (FastAPI subclass) — deploys anywhere that runs Python ASGI apps.
+- [Storage backends](/harnessapi/multi-tenancy/storage) — SQLite backend also persists sandbox connection metadata
+- [Admin MCP server](/harnessapi/multi-tenancy/admin-mcp) — `provision_sandbox`, `teardown_sandbox`, `push_to_sandbox` MCP tools
+- [API reference](/harnessapi/multi-tenancy/api-reference) — sandbox endpoint list
 
-### Railway
+---
 
-Set start command: uvicorn main:app --host 0.0.0.0 --port $PORT
+## Storage backends
 
-### Fly.io
+Variants created and promoted during a server session need to survive restarts. harnessapi uses a pluggable **storage backend** to persist variant source code and status. On startup, promoted and preview variants are loaded from storage, recompiled, and registered — so routing resumes exactly where it left off.
 
-    fly launch && fly secrets set OPENAI_API_KEY=sk-... && fly deploy
+---
 
-### Docker
+## Choosing a backend
 
-    FROM python:3.11-slim
-    WORKDIR /app
-    COPY . .
-    RUN pip install uv && uv sync --no-dev
-    EXPOSE 8000
-    CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
+| Backend | Persistence | Best for |
+|---|---|---|
+| `InProcessStorageBackend` | None (memory only) | Development, testing |
+| `LocalFileStorageBackend` | JSON files in a directory | Single-worker, no database |
+| `SQLiteStorageBackend` | SQLite file | Single-worker production |
+| Custom (implement the protocol) | Whatever you need | PostgreSQL, Redis, DynamoDB, etc. |
 
-### Production config
+---
 
-    app = HarnessAPI(
-        skills_dir="./skills",
-        enable_edit_endpoints=os.getenv("ENABLE_EDIT") == "true",  # disabled by default
-    )
+## InProcessStorageBackend
+
+The default when no `storage` argument is passed to `TenantBackend`. Variants are kept in a plain Python dict and disappear when the process exits.
+
+```python
+from harnessapi.multitenancy import TenantBackend, InProcessStorageBackend
+
+backend = TenantBackend(
+    tenant_extractor=lambda req: req.headers.get("X-Tenant-ID"),
+    storage=InProcessStorageBackend(),  # default — can be omitted
+)
+```
+
+Use this for local development and tests where persistence is not needed.
+
+---
+
+## LocalFileStorageBackend
+
+Writes one JSON file per variant to a directory. No database required. Files survive process restarts and can be inspected or backed up with standard file tools.
+
+```python
+from harnessapi.multitenancy import TenantBackend, LocalFileStorageBackend
+
+backend = TenantBackend(
+    tenant_extractor=lambda req: req.headers.get("X-Tenant-ID"),
+    storage=LocalFileStorageBackend(variants_dir="./variants"),
+)
+```
+
+Each variant is stored as `./variants/{variant_id}.json`. The file contains the full variant record including source code, status, tenant ID, and timestamps.
+
+**Limitations:** No atomic transactions, no concurrent-write safety. Suitable for single-worker deployments only.
+
+---
+
+## SQLiteStorageBackend
+
+Persistent SQLite-backed storage using Python's stdlib `sqlite3` — no extra dependencies. In addition to variants, it also persists sandbox connection metadata (endpoint URL, pid, auth token) so sandbox registrations survive restarts.
+
+```python
+from harnessapi.multitenancy import TenantBackend, SQLiteStorageBackend
+
+backend = TenantBackend(
+    tenant_extractor=lambda req: req.headers.get("X-Tenant-ID"),
+    storage=SQLiteStorageBackend(path="./variants.db"),
+)
+```
+
+The database is created automatically on first use. Schema:
+
+- `skill_variant` table — stores variant records. Status constrained to `sandbox | preview | promoted`.
+- `sandbox_connection` table — stores sandbox metadata (only populated when `sandbox_registry` is set).
+
+**Limitations:** SQLite's write-lock model makes this unsuitable for multi-worker deployments (multiple Uvicorn/Gunicorn workers writing simultaneously). Use a networked database for multi-worker setups.
+
+---
+
+## Custom backend
+
+Implement the `StorageBackend` protocol — a structural protocol, no base class required:
+
+```python
+class MyPostgresBackend:
+    async def save_variant(self, variant) -> None: ...
+    async def load_promoted_variants(self) -> list: ...
+    async def load_preview_variants(self) -> list: ...
+    async def load_sandbox_variant(self, variant_id: str): ...
+    async def delete_variant(self, variant_id: str) -> None: ...
+    async def promote_variant(self, variant_id: str) -> None: ...
+    async def demote_variant(self, variant_id: str) -> None: ...
+    async def preview_variant(self, variant_id: str) -> None: ...
+    async def list_variants(self, tenant_id: str) -> list: ...
+```
+
+All methods are async. `load_promoted_variants` and `load_preview_variants` are called at startup to restore active routing. `load_sandbox_variant` is called on-demand to retrieve a specific sandbox-status variant for testing.
+
+Pass your instance directly:
+
+```python
+backend = TenantBackend(
+    tenant_extractor=...,
+    storage=MyPostgresBackend(dsn=os.environ["DATABASE_URL"]),
+)
+```
+
+---
+
+## Startup restore behavior
+
+When the server starts, harnessapi calls `storage.load_promoted_variants()` and `storage.load_preview_variants()`. For each returned variant it:
+
+1. Compiles the stored handler source into a live function
+2. Registers it in the in-memory `TenantSkillRegistry` under the appropriate key
+
+This means a server restart is transparent to callers — active routing resumes immediately without any re-promotion step.
+
+---
+
+## See also
+
+- [Per-user sandboxes](/harnessapi/multi-tenancy/sandboxes) — SQLite backend also stores sandbox connection metadata
+- [API reference](/harnessapi/multi-tenancy/api-reference) — TenantBackend configuration reference
+
+---
+
+## Admin MCP server
+
+The admin MCP server exposes the entire multi-tenancy management API as [Model Context Protocol](https://modelcontextprotocol.io) tools. Instead of calling REST endpoints directly, agents — including Claude Desktop, Claude Code, and any custom agent — can manage skill variants natively, as if they were built-in capabilities.
+
+This is the primary interface for **agent-driven skill customization**: an agent can clone a skill, submit modified code, test it, set it to preview, and promote it to production, all through MCP tool calls with no curl commands required.
+
+---
+
+## Enabling the admin MCP server
+
+```python
+from harnessapi import HarnessAPI
+from harnessapi.multitenancy import TenantBackend, SQLiteStorageBackend
+
+backend = TenantBackend(
+    tenant_extractor=lambda req: req.headers.get("X-Tenant-ID"),
+    storage=SQLiteStorageBackend(path="./variants.db"),
+)
+
+app = HarnessAPI(
+    skills_dir="./skills",
+    tenant_backend=backend,
+    enable_admin_mcp=True,   # mounts /admin-mcp
+)
+```
+
+The admin MCP server is mounted at `/admin-mcp` and is separate from the skill MCP server at `/mcp`. The skill MCP server is always tenant-agnostic; the admin MCP server is for management only.
+
+---
+
+## Connecting from Claude Desktop or Claude Code
+
+Add to your MCP config:
+
+```json
+{
+  "mcpServers": {
+    "harnessapi-admin": {
+      "url": "http://localhost:8000/admin-mcp"
+    }
+  }
+}
+```
+
+All 12 management tools appear immediately. No restart required after adding new skills.
+
+---
+
+## Available tools
+
+| Tool | What it does |
+|---|---|
+| `clone_skill` | Copy base handler source as a sandbox variant — starting point for customization |
+| `customize_skill` | Submit modified handler source — validated before storing |
+| `run_variant` | Test a variant with input — forwards to sandbox if provisioned, otherwise runs in-process |
+| `preview_variant` | Route real tenant traffic through a variant without full promotion |
+| `promote_variant` | Make a variant the active handler for a tenant (demotes previous promoted) |
+| `demote_variant` | Move a promoted or preview variant back to sandbox |
+| `get_variant_source` | Read the current handler source for any variant |
+| `list_tenant_skills` | List all variants for a tenant across all skills |
+| `provision_sandbox` | Boot a per-tenant sandbox process |
+| `teardown_sandbox` | Shut down a tenant's sandbox |
+| `sandbox_health` | Check if a sandbox is reachable and responding |
+| `push_to_sandbox` | Deploy the promoted variant's handler source to the sandbox |
+
+---
+
+## Example agent workflow (MCP tools only)
+
+```
+1. clone_skill       → variant_id returned (sandbox status)
+2. customize_skill   → submit modified source, validated + stored
+3. run_variant       → test with sample input, verify output
+4. preview_variant   → variant routes real traffic for the tenant (optional staging)
+5. promote_variant   → variant becomes permanent active handler
+6. push_to_sandbox   → if tenant has a sandbox, sync the promoted handler to it
+```
+
+From the agent's perspective, this is a fully self-contained loop — no HTTP client needed, no manual endpoint construction.
+
+---
+
+## Protecting /admin-mcp
+
+> **Security:** The admin MCP server has no authentication by default. Every tool can execute validated code on your server and manage any tenant's variants. You must protect `/admin-mcp` before enabling in production. Never expose it on a public network without auth.
+
+Pass an `admin_mcp_auth` callable to `HarnessAPI`. It receives the incoming request and a `call_next` function — return a 4xx response to reject, or `await call_next(request)` to allow:
+
+```python
+import os
+from starlette.responses import JSONResponse
+
+async def require_api_key(request, call_next):
+    if request.headers.get("X-Admin-Key") != os.environ["ADMIN_KEY"]:
+        return JSONResponse({"detail": "Forbidden"}, status_code=403)
+    return await call_next(request)
+
+app = HarnessAPI(
+    skills_dir="./skills",
+    tenant_backend=backend,
+    enable_admin_mcp=True,
+    admin_mcp_auth=require_api_key,
+)
+```
+
+The signature is `async (request, call_next) -> Response`. Any async callable works — use JWT verification, IP allowlisting, mTLS checks, or any other mechanism.
+
+### Connecting with auth from Claude Desktop
+
+```json
+{
+  "mcpServers": {
+    "harnessapi-admin": {
+      "url": "http://localhost:8000/admin-mcp",
+      "headers": {
+        "X-Admin-Key": "your-secret-key"
+      }
+    }
+  }
+}
+```
+
+---
+
+## Relationship to the skill MCP server (`/mcp`)
+
+| | `/mcp` | `/admin-mcp` |
+|---|---|---|
+| Purpose | Exposes skills as tools for end users | Exposes management API for operators/agents |
+| Tenant context | None — always base skills | Fully tenant-aware |
+| Auth | No built-in auth | Via `admin_mcp_auth` |
+| Enabled | Always | Only when `enable_admin_mcp=True` |
+
+---
+
+## See also
+
+- [Multi-tenancy overview](/harnessapi/multi-tenancy/index) — how routing works
+- [Variant lifecycle](/harnessapi/multi-tenancy/variants) — full clone → promote workflow
+- [Preview & staging](/harnessapi/multi-tenancy/preview) — `preview_variant` tool in context
+- [Per-user sandboxes](/harnessapi/multi-tenancy/sandboxes) — `provision_sandbox`, `push_to_sandbox` tools
+- [API reference](/harnessapi/multi-tenancy/api-reference) — REST endpoints underlying each MCP tool
+
+---
+
+## API reference
+
+## Management endpoints
+
+All management endpoints are added automatically when a `tenant_backend` is passed to `HarnessAPI`. They are in addition to the normal skill endpoints (`POST /skills/{name}`).
+
+### Variant lifecycle
+
+| Method | Path | Description |
+|---|---|---|
+| `POST` | `/tenants/{tenant_id}/skills/{name}/clone` | Copy base handler source as a new sandbox variant |
+| `POST` | `/tenants/{tenant_id}/skills/{name}/customize` | Submit handler source — validate, store, optionally promote |
+| `POST` | `/tenants/{tenant_id}/skills/{name}/variants/{id}/preview` | Set as preview — routes real traffic, coexists with promoted |
+| `POST` | `/tenants/{tenant_id}/skills/{name}/variants/{id}/promote` | Make variant active for tenant (demotes previous promoted) |
+| `POST` | `/tenants/{tenant_id}/skills/{name}/variants/{id}/demote` | Move back to sandbox status |
+| `POST` | `/tenants/{tenant_id}/skills/{name}/variants/{id}/run` | Test with input — forwards to sandbox if provisioned, else in-process |
+| `DELETE` | `/tenants/{tenant_id}/skills/{name}/variants/{id}` | Delete variant permanently |
+
+### Introspection
+
+| Method | Path | Description |
+|---|---|---|
+| `GET` | `/tenants/{tenant_id}/skills` | List all variants for a tenant (all skills) |
+| `GET` | `/tenants/{tenant_id}/skills/{name}/variants` | List variants for a specific skill |
+| `GET` | `/tenants/{tenant_id}/skills/{name}/variants/{id}/source` | Get handler source for a variant |
+
+### Sandbox lifecycle
+
+Available only when `sandbox_registry` is set in `TenantBackend`.
+
+| Method | Path | Description |
+|---|---|---|
+| `POST` | `/tenants/{tenant_id}/sandbox/provision` | Boot a sandbox process for the tenant |
+| `DELETE` | `/tenants/{tenant_id}/sandbox` | Tear down the tenant's sandbox |
+| `GET` | `/tenants/{tenant_id}/sandbox/health` | Health check — returns status and last_seen timestamp |
+| `POST` | `/tenants/{tenant_id}/skills/{name}/push-to-sandbox` | Push promoted variant handler source to sandbox |
+
+---
+
+## `customize` request body
+
+```json
+{
+  "source_code": "async def handle(input: Input) -> Output: ...",
+  "auto_promote": false
+}
+```
+
+| Field | Type | Default | Description |
+|---|---|---|---|
+| `source_code` | `string` | required | Handler source — must pass AST validation |
+| `auto_promote` | `bool` | `false` | If `true`, promote immediately after storing |
+
+---
+
+## `provision` request body
+
+```json
+{
+  "skills_dir": "./skills"
+}
+```
+
+---
+
+## TenantBackend configuration
+
+```python
+from harnessapi.multitenancy import TenantBackend, SQLiteStorageBackend, SandboxRegistry
+
+backend = TenantBackend(
+    # Required
+    tenant_extractor=lambda req: req.headers.get("X-Tenant-ID"),
+
+    # Storage (default: InProcessStorageBackend — ephemeral)
+    storage=SQLiteStorageBackend(path="./variants.db"),
+
+    # Validation
+    sandbox_import_blocklist=["os", "subprocess", "socket", "sys", "importlib", "builtins"],
+
+    # Behaviour
+    auto_promote=False,                    # promote immediately on customize
+    max_variants_per_tenant_per_skill=10,  # 409 Conflict when exceeded
+    sandbox_run_timeout_secs=10.0,         # timeout for /run and sandbox-forwarded calls
+
+    # Per-tenant sandboxes (optional)
+    sandbox_registry=SandboxRegistry(),
+    sandbox_provider="local_subprocess",   # or "docker", "kubernetes", or a custom instance
+    sandbox_provider_config={},            # passed as kwargs to provider.provision()
+)
+```
+
+| Parameter | Type | Default | Description |
+|---|---|---|---|
+| `tenant_extractor` | `Callable[[Request], str \| None]` | required | Extracts tenant ID from each request. Return `None` to route to base skill. |
+| `storage` | `StorageBackend` | `InProcessStorageBackend()` | Where variants are persisted. |
+| `sandbox_import_blocklist` | `list[str]` | `["os", "subprocess", "socket", "sys", "importlib", "builtins"]` | Imports blocked by AST validation. |
+| `auto_promote` | `bool` | `False` | If `True`, variants are promoted immediately on customize. |
+| `max_variants_per_tenant_per_skill` | `int` | `10` | Maximum sandbox variants per (tenant, skill). Returns `409` when exceeded. |
+| `sandbox_run_timeout_secs` | `float` | `10.0` | Timeout in seconds for `/run` and sandbox-forwarded skill calls. |
+| `sandbox_registry` | `SandboxRegistry \| None` | `None` | In-memory map of running sandbox connections. Required to enable per-tenant sandboxes. |
+| `sandbox_provider` | `str \| SandboxProvider` | `None` | Provider to use when provisioning sandboxes. Strings: `"local_subprocess"`, `"docker"`, `"kubernetes"`. |
+| `sandbox_provider_config` | `dict` | `{}` | Extra kwargs forwarded to `provider.provision()`. |
+
+---
+
+## HarnessAPI multi-tenancy parameters
+
+```python
+app = HarnessAPI(
+    skills_dir="./skills",
+    tenant_backend=backend,       # enables multi-tenancy
+    enable_admin_mcp=True,        # mounts /admin-mcp
+    admin_mcp_auth=require_api_key,  # protects /admin-mcp
+)
+```
+
+| Parameter | Type | Default | Description |
+|---|---|---|---|
+| `tenant_backend` | `TenantBackend \| None` | `None` | Enables multi-tenancy and the `/tenants/*` management API. |
+| `enable_admin_mcp` | `bool` | `False` | Mounts the admin MCP server at `/admin-mcp`. |
+| `admin_mcp_auth` | `Callable \| None` | `None` | Async middleware for `/admin-mcp`. Signature: `async (request, call_next) -> Response`. |
+
+---
+
+## Complete setup example
+
+```python
+import os
+from pathlib import Path
+from starlette.responses import JSONResponse
+from harnessapi import HarnessAPI
+from harnessapi.multitenancy import TenantBackend, SQLiteStorageBackend, SandboxRegistry
+
+async def require_api_key(request, call_next):
+    if request.headers.get("X-Admin-Key") != os.environ["ADMIN_KEY"]:
+        return JSONResponse({"detail": "Forbidden"}, status_code=403)
+    return await call_next(request)
+
+backend = TenantBackend(
+    tenant_extractor=lambda req: req.headers.get("X-Tenant-ID"),
+    storage=SQLiteStorageBackend(path="./variants.db"),
+    sandbox_registry=SandboxRegistry(),
+    sandbox_provider="local_subprocess",
+    auto_promote=False,
+    max_variants_per_tenant_per_skill=5,
+    sandbox_run_timeout_secs=10.0,
+)
+
+app = HarnessAPI(
+    skills_dir=Path(__file__).parent / "skills",
+    tenant_backend=backend,
+    enable_admin_mcp=True,
+    admin_mcp_auth=require_api_key,
+)
+```
+
+---
+
+## See also
+
+- [Multi-tenancy overview](/harnessapi/multi-tenancy/index) — routing resolution order, drop-in setup
+- [Variant lifecycle](/harnessapi/multi-tenancy/variants) — clone → promote workflow
+- [Preview & staging](/harnessapi/multi-tenancy/preview) — preview endpoint behavior
+- [Per-user sandboxes](/harnessapi/multi-tenancy/sandboxes) — sandbox workflow and providers
+- [Storage backends](/harnessapi/multi-tenancy/storage) — backend options and custom protocol
+- [Admin MCP server](/harnessapi/multi-tenancy/admin-mcp) — MCP tools for each endpoint
+
+---
+
+## Convert an agentskills.io skill
+
+harnessapi is a superset of the [agentskills.io](https://agentskills.io) standard. Any folder with a `SKILL.md` is a valid agentskills.io skill. Adding `handler.py` and `models.py` makes it a full harnessapi skill — a live HTTP endpoint and MCP tool.
+
+## One skill
+
+1. **Start with an existing agentskills.io skill**
+
+   ```
+   .agents/skills/summarize/
+   └── SKILL.md
+   ```
+
+2. **Run `harnessapi init --skill`**
+
+   ```bash
+   harnessapi init --skill .agents/skills/summarize
+   ```
+
+   Output:
+   ```
+   Adding harnessapi layer to skill: summarize
+
+     created  .agents/skills/summarize/models.py
+     created  .agents/skills/summarize/handler.py
+     created  .agents/skills/summarize/skill.toml
+     created  main.py
+   ```
+
+3. **Implement the handler**
+
+   Open `handler.py` and replace the stub with your logic:
+
+   ```python title=".agents/skills/summarize/handler.py"
+   from .models import Input, Output
+
+   async def handle(input: Input) -> Output:
+       # TODO: implement
+       return Output(result=input.text[:100])
+   ```
+
+4. **Run**
+
+   ```bash
+   harnessapi run
+   ```
+
+## Whole directory
+
+1. **Convert every skill in a directory at once**
+
+   ```bash
+   harnessapi init --skills-dir .agents/skills
+   ```
+
+   This adds `handler.py`, `models.py`, and `skill.toml` stubs to every subfolder that has a `SKILL.md`, and generates a single `main.py` at the parent level.
+
+2. **Implement each handler**
+
+3. **Run**
+
+   ```bash
+   harnessapi run
+   ```
+
+  Existing files are never overwritten — re-running `init --skill` on a folder that already has `handler.py` will skip it safely.
+
+## What stays unchanged
+
+harnessapi never modifies your `SKILL.md`. All agentskills.io tooling (Claude Code, Cursor, Copilot) continues to work exactly as before — harnessapi adds the API layer on top.
+
+## Metadata priority
+
+| Source | Priority |
+|--------|----------|
+| `skill.toml` | Highest — overrides everything |
+| `SKILL.md` frontmatter | Used when no `skill.toml` |
+| Folder name / docstring | Fallback |
 
 ---
 
 ## Connect to Claude Desktop
 
-Every harnessapi skill is automatically registered as an MCP tool. Connecting takes under a minute.
+Every harnessapi skill is automatically registered as an MCP tool. Connecting to Claude Desktop or Cursor takes under a minute.
 
-1. Start server: harnessapi run
-2. macOS: Edit ~/Library/Application Support/Claude/claude_desktop_config.json
-   Windows: Edit %APPDATA%\Claude\claude_desktop_config.json
-   {"mcpServers": {"my-skills": {"url": "http://localhost:8000/mcp"}}}
-3. Restart Claude Desktop — your skills appear in the tools panel.
+## Claude Desktop
 
-Write skill descriptions as instructions to the LLM — the description directly controls when the model chooses to call your tool.
+1. **Start your server**
+
+   ```bash
+   harnessapi run
+   ```
+
+2. **Edit Claude Desktop config**
+
+   Open `~/Library/Application Support/Claude/claude_desktop_config.json` (macOS) or `%APPDATA%\Claude\claude_desktop_config.json` (Windows):
+
+   ```json
+   {
+     "mcpServers": {
+       "my-skills": {
+         "url": "http://localhost:8000/mcp"
+       }
+     }
+   }
+   ```
+
+3. **Restart Claude Desktop**
+
+   Your skills appear in the tools panel. Claude can now call them during any conversation.
+
+## Cursor
+
+1. Open **Cursor Settings** → **MCP** → **Add Server**
+
+2. Add:
+
+   ```json
+   {
+     "my-skills": {
+       "url": "http://localhost:8000/mcp"
+     }
+   }
+   ```
+
+3. Save and reload. Skills appear as tools Cursor's AI can call.
+
+## Verify connection
+
+Ask Claude or Cursor:
+
+> "What tools do you have available?"
+
+Your skill names and descriptions should appear in the response.
+
+## Tool naming
+
+The MCP tool name is the skill folder name. Customize it in `skill.toml`:
+
+```toml
+[skill]
+description = "Summarize text to a target length. Use when asked to shorten or condense text."
+```
+
+Write the description as an instruction to the LLM — it directly controls when the model chooses to call your tool.
+
+## Production
+
+For production, deploy harnessapi to a server with a public URL and update the config:
+
+```json
+{
+  "mcpServers": {
+    "my-skills": {
+      "url": "https://your-domain.com/mcp"
+    }
+  }
+}
+```
+
+See [Deploy to production](/guides/deploy/) for deployment options.
 
 ---
 
-## See Also
+## Deploy to production
 
-- FastMCP: https://github.com/jlowin/fastmcp — MCP server framework harnessapi builds on
-- FastAPI: https://fastapi.tiangolo.com — the HTTP layer underneath
-- agentskills.io: https://agentskills.io — skill folder standard harnessapi is compatible with
-- Model Context Protocol: https://modelcontextprotocol.io — the open protocol for agent tools
-- Pydantic: https://docs.pydantic.dev — data validation for skill inputs and outputs
+harnessapi is a standard ASGI app (FastAPI subclass) — it deploys anywhere that runs Python ASGI apps.
+
+## Railway (recommended — one click)
+
+1. Push your project to GitHub
+2. Go to [railway.app](https://railway.app) → New Project → Deploy from GitHub
+3. Set the start command:
+
+   ```
+   uvicorn main:app --host 0.0.0.0 --port $PORT
+   ```
+
+4. Add environment variables (e.g. `OPENAI_API_KEY`)
+5. Deploy — Railway provides a public URL automatically
+
+## Fly.io
+
+```bash
+fly launch
+fly secrets set OPENAI_API_KEY=sk-...
+fly deploy
+```
+
+`fly.toml`:
+
+```toml
+[http_service]
+  internal_port = 8000
+  force_https = true
+```
+
+## Docker
+
+```dockerfile title="Dockerfile"
+FROM python:3.11-slim
+WORKDIR /app
+COPY . .
+RUN pip install uv && uv sync --no-dev
+EXPOSE 8000
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
+```
+
+```bash
+docker build -t my-skills .
+docker run -p 8000:8000 -e OPENAI_API_KEY=sk-... my-skills
+```
+
+## Gunicorn (multi-worker)
+
+```bash
+pip install gunicorn uvicorn
+gunicorn main:app -w 4 -k uvicorn.workers.UvicornWorker --bind 0.0.0.0:8000
+```
+
+## Environment variables
+
+Store secrets as environment variables — never in `skill.toml` or handler files:
+
+```python title="skills/summarize/handler.py"
+import os
+api_key = os.environ["OPENAI_API_KEY"]
+```
+
+## Disable edit endpoints in production
+
+```python title="main.py"
+import os
+app = HarnessAPI(
+    skills_dir="./skills",
+    enable_edit_endpoints=os.getenv("ENABLE_EDIT") == "true",
+)
+```
+
+## Connect MCP clients to production
+
+Update your Claude Desktop or Cursor config to point to your deployed URL:
+
+```json
+{
+  "mcpServers": {
+    "my-skills": {
+      "url": "https://your-app.railway.app/mcp"
+    }
+  }
+}
+```
+
+---
+
+## harnessapi init
+
+Scaffolds a new harnessapi project or adds the harnessapi layer to existing skill folders.
+
+## Usage
+
+```
+harnessapi init [project-name]
+harnessapi init --skill <path>
+harnessapi init --skills-dir <dir>
+harnessapi init --function <file.py> [--output <dir>]
+```
+
+---
+
+## Default — new project
+
+```bash
+harnessapi init my-project
+```
+
+Creates a new project with a sample `greet` skill:
+
+```
+my-project/
+├── main.py
+├── README.md
+├── .gitignore
+└── skills/
+    └── greet/
+        ├── handler.py
+        ├── models.py
+        ├── SKILL.md
+        ├── skill.toml
+        ├── defaults/
+        │   └── input.json
+        └── examples/
+            └── 01.json
+```
+
+If run in an empty directory, scaffolds in-place instead of creating a subdirectory.
+
+---
+
+## `--skill` — add API layer to an existing skill
+
+```bash
+harnessapi init --skill .agents/skills/summarize
+```
+
+Reads the existing `SKILL.md`, then adds:
+- `handler.py` — stub with `TODO` comments
+- `models.py` — stub Input and Output classes
+- `skill.toml` — populated from `SKILL.md` frontmatter
+
+Skips any file that already exists. Never modifies `SKILL.md`.
+
+---
+
+## `--skills-dir` — convert a whole directory
+
+```bash
+harnessapi init --skills-dir .agents/skills
+```
+
+Scans for all subfolders containing `SKILL.md`, adds stubs to each, and generates a top-level `main.py` pointing at the directory.
+
+---
+
+## `--function` — wrap a Python function
+
+```bash
+harnessapi init --function utils/compute.py --output skills
+```
+
+Uses Python `ast` to introspect the function's signature (no import needed), then generates:
+- `skills//SKILL.md` — from docstring
+- `skills//models.py` — Input fields from parameters
+- `skills//handler.py` — calls the original function
+- `skills//skill.toml`
+
+If multiple functions exist in the file, you are prompted to choose one.
+
+**Options:**
+
+| Flag | Description |
+|------|-------------|
+| `--output ` | Output directory for the skill folder (default: `./skills`) |
+
+---
+
+## harnessapi run
+
+Starts the harnessapi development server using uvicorn with auto-reload enabled.
+
+## Usage
+
+```bash
+harnessapi run [options]
+```
+
+## Options
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--app MODULE:ATTR` | auto-detected | App to serve (e.g. `main:app`) |
+| `--host HOST` | `127.0.0.1` | Bind host |
+| `--port PORT` | `8000` | Bind port |
+| `--no-reload` | — | Disable auto-reload |
+
+## Auto-detection
+
+If `--app` is not specified, harnessapi scans the current directory for `main.py` or `app.py` and finds the `HarnessAPI` instance automatically.
+
+## Examples
+
+```bash
+# Default — auto-detects main:app, port 8000, with reload
+harnessapi run
+
+# Custom port
+harnessapi run --port 8080
+
+# Expose to network
+harnessapi run --host 0.0.0.0 --port 8000
+
+# Production (no reload)
+harnessapi run --no-reload
+
+# Explicit app
+harnessapi run --app mymodule:app
+```
+
+## URLs when running
+
+| URL | What |
+|-----|------|
+| `http://localhost:8000/skills/{name}` | Skill HTTP endpoints |
+| `http://localhost:8000/docs` | Swagger UI |
+| `http://localhost:8000/redoc` | ReDoc |
+| `http://localhost:8000/mcp` | MCP server |
+| `http://localhost:8000/openapi.json` | OpenAPI schema |
+
+## Production deployment
+
+For production, use uvicorn or gunicorn directly:
+
+```bash
+uvicorn main:app --host 0.0.0.0 --port 8000 --workers 4
+```
+
+See [Deploy to production](/guides/deploy/) for full guidance.
+
