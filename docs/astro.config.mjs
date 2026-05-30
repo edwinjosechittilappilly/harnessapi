@@ -66,6 +66,7 @@ export default defineConfig({
             { label: 'Summarizer — LLM skill', slug: 'examples/summarizer' },
             { label: 'Web scraper', slug: 'examples/web-scraper' },
             { label: 'Image captioner', slug: 'examples/image-captioner' },
+            { label: 'Agentic RAG — multi-tenancy', slug: 'examples/agentic-rag' },
           ],
         },
         {

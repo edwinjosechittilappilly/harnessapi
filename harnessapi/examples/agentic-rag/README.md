@@ -315,49 +315,52 @@ Add to your MCP config with the admin key:
 }
 ```
 
+The admin MCP exposes these tools: `clone_skill`, `customize_skill`, `promote_variant`, `demote_variant`, `preview_variant`, `run_variant`, `get_variant_source`, `list_tenant_skills`, `provision_sandbox`, `teardown_sandbox`, `sandbox_health`, `push_to_sandbox`. The same operations are also available as a REST API under `/tenants/...`.
+
 ### Customize the search skill for a tenant
+
+The variant lifecycle is **clone → customize → (preview / run) → promote**. Via the REST API:
 
 ```bash
 # 1. Clone the search skill for tenant-1
-curl -X POST http://localhost:8000/api/variants/tenant-1/search/clone \
+curl -X POST http://localhost:8000/tenants/tenant-1/skills/search/clone \
   -H "X-Admin-Key: dev-secret"
 
-# 2. Push a customized handler (e.g., use a different model or system prompt)
-curl -X POST http://localhost:8000/api/variants/tenant-1/search/push \
+# 2. Submit a customized handler (e.g., a different model or system prompt).
+#    auto_promote: false stores the variant without making it live yet.
+curl -X POST http://localhost:8000/tenants/tenant-1/skills/search/customize \
   -H "Content-Type: application/json" \
   -H "X-Admin-Key: dev-secret" \
-  -d '{"file": "handler.py", "content": "..."}'
+  -d '{"source_code": "async def handle(input):\n    ...customized handler...\n", "auto_promote": false}'
 
-# 3. Preview in sandbox — calls go through tenant variant, not prod
-curl -X POST http://localhost:8000/api/variants/tenant-1/search/preview \
+# 3. Find the variant id
+curl http://localhost:8000/tenants/tenant-1/skills/search/variants \
   -H "X-Admin-Key: dev-secret"
 
-# 4. Promote once satisfied
-curl -X POST http://localhost:8000/api/variants/tenant-1/search/promote \
+# 4. Test it without affecting live traffic
+curl -X POST http://localhost:8000/tenants/tenant-1/skills/search/variants/<variant_id>/run \
+  -H "Content-Type: application/json" \
+  -H "X-Admin-Key: dev-secret" \
+  -d '{"query": "Apollo mission details"}'
+
+# 5. Promote once satisfied (or /preview to route real calls without promoting)
+curl -X POST http://localhost:8000/tenants/tenant-1/skills/search/variants/<variant_id>/promote \
   -H "X-Admin-Key: dev-secret"
 ```
 
-After promotion, all calls from `tenant-1` to `/skills/search` run their customized handler. Other tenants are unaffected.
+After promotion, all calls from `tenant-1` to `/skills/search` run their customized handler. Other tenants are unaffected. harnessapi resolves the handler per request in the order **sandbox → promoted variant → preview variant → base skill**.
 
 ---
 
 ## Per-tenant sandbox execution
 
-Provision an isolated execution environment for a tenant:
+Sandboxes run a tenant's handler in an isolated subprocess (`sandbox_provider="local_subprocess"`). They are managed through the **admin MCP tools** — there is no REST sandbox route. The flow:
 
-```bash
-# Provision sandbox
-curl -X POST http://localhost:8000/api/sandboxes/tenant-1/provision \
-  -H "X-Admin-Key: dev-secret" \
-  -d '{"skill": "search"}'
-
-# Calls from tenant-1 now run in an isolated subprocess
-curl -X POST http://localhost:8000/skills/search \
-  -H "X-Tenant-ID: tenant-1" \
-  -H "Content-Type: application/json" \
-  -H "Accept: application/json" \
-  -d '{"query": "Apollo mission details"}'
-```
+1. `provision_sandbox(tenant_id="tenant-1")` — start the subprocess and register its endpoint.
+2. `push_to_sandbox(tenant_id="tenant-1", skill_name="search")` — push the promoted (or base) handler source into it.
+3. `run_variant(...)` or a normal `/skills/search` call from `tenant-1` is now forwarded to the sandbox.
+4. `sandbox_health(tenant_id="tenant-1")` — confirm it's reachable.
+5. `teardown_sandbox(tenant_id="tenant-1")` — shut it down.
 
 ---
 

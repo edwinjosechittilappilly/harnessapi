@@ -1,0 +1,595 @@
+---
+title: "Agentic RAG — multi-tenancy"
+description: A complete agentic RAG server with per-tenant vector isolation, streaming GPT-4o answers, MCP tools, and an admin MCP for per-tenant skill customization.
+---
+
+import { Steps, Aside } from '@astrojs/starlight/components';
+
+A complete, runnable agentic RAG system with **per-tenant document isolation** built on
+harnessapi + multi-tenancy. Each tenant gets their own vector store — documents ingested
+by one tenant are invisible to another. The same three skills are served as HTTP SSE
+endpoints **and** MCP tools, and an **admin MCP** lets an agent customize how a skill
+behaves per-tenant without redeploying.
+
+```
+POST /skills/ingest      ← chunk, embed, index a document
+POST /skills/search      ← semantic search + GPT-4o answer (streaming)
+POST /skills/list_docs   ← list indexed documents for this tenant
+GET  /mcp                ← all three skills as MCP tools
+GET  /admin-mcp          ← skill variant + sandbox management (admin only)
+GET  /docs               ← Swagger UI
+```
+
+**What it demonstrates:**
+- Per-tenant vector isolation — one ChromaDB collection per `X-Tenant-ID`
+- Local embeddings with `all-MiniLM-L6-v2` (no API key needed to ingest)
+- Streaming GPT-4o answers token-by-token over SSE
+- The same skills exposed as REST endpoints **and** MCP tools
+- The **admin MCP** + tenant REST API for the clone → customize → preview → promote
+  variant lifecycle
+- Per-tenant subprocess sandboxes provisioned through admin MCP tools
+
+---
+
+## Architecture
+
+```
+Client (curl / Claude Desktop / agent)
+        │
+        │  X-Tenant-ID: tenant-1          ← header identifies tenant
+        ▼
+┌─────────────────────────────────────────┐
+│            harnessapi server            │
+│                                         │
+│  TenantContextMiddleware                │
+│  (copies tenant_id → ContextVar)        │
+│                 │                       │
+│    ┌────────────┼────────────┐          │
+│    ▼            ▼            ▼          │
+│  ingest       search     list_docs      │
+│    │            │                       │
+│    ▼            ▼                       │
+│  ChromaDB (rag_tenant-1)                │  ← isolated per tenant
+│  ChromaDB (rag_tenant-2)                │  ← completely separate
+└─────────────────────────────────────────┘
+        │
+        ▼  (search skill only)
+    OpenAI GPT-4o (streaming answer)
+```
+
+- **Embedding model:** `all-MiniLM-L6-v2` via sentence-transformers — runs locally, no API key needed for ingest.
+- **Vector store:** ChromaDB — persisted to `./chroma_data/`, one collection (`rag_{tenant_id}`) per tenant.
+- **Answer generation:** OpenAI GPT-4o — streaming tokens via SSE.
+- **Variant storage:** SQLite (`./variants.db`) — persists skill customizations across restarts.
+
+---
+
+## The skills
+
+Each skill is a folder under `skills/` with a `models.py` (Pydantic `Input`/`Output`)
+and a `handler.py` (an async `handle` function, optionally a generator for streaming).
+The `skill.toml` adds metadata — `is_mcp = true` exposes the skill as an MCP tool.
+
+### ingest — chunk, embed, index
+
+```toml title="skills/ingest/skill.toml"
+[skill]
+description  = "Ingest a document into the tenant's vector store. Chunks, embeds, and indexes the text for semantic search."
+is_mcp       = true
+tags         = ["rag"]
+timeout_secs = 120
+```
+
+```python title="skills/ingest/models.py"
+from harnessapi import SkillInput, SkillOutput
+
+
+class Input(SkillInput):
+    text: str
+    doc_id: str
+    metadata: dict[str, str] = {}
+    chunk_size: int = 500
+    chunk_overlap: int = 50
+
+
+class Output(SkillOutput):
+    doc_id: str
+    chunk_count: int
+    status: str
+```
+
+### search — semantic search + GPT-4o answer
+
+```toml title="skills/search/skill.toml"
+[skill]
+description  = "Search the tenant's document store with a natural language query and get a GPT-4o generated answer with sources."
+is_mcp       = true
+tags         = ["rag"]
+timeout_secs = 60
+```
+
+```python title="skills/search/models.py"
+from harnessapi import SkillInput, SkillOutput
+
+
+class Input(SkillInput):
+    query: str
+    top_k: int = 5
+    include_sources: bool = True
+
+
+class Output(SkillOutput):
+    answer: str
+    sources: list[dict]
+```
+
+The handler reads the tenant from a `ContextVar`, embeds the query, retrieves the
+top-k chunks from that tenant's collection, then streams a GPT-4o answer grounded in
+the retrieved context:
+
+```python title="skills/search/handler.py" {1-2,8-11}
+async def handle(input: Input):
+    tenant_id = tenant_id_var.get()
+    collection = get_collection(tenant_id)
+    # ...embed the query, query ChromaDB for top_k chunks...
+    stream = await client.chat.completions.create(
+        model=os.environ.get("OPENAI_MODEL", "gpt-4o"),
+        messages=[
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": f"Context:\n{context}\n\nQuestion: {input.query}"},
+        ],
+        stream=True,
+    )
+    async for chunk in stream:
+        delta = chunk.choices[0].delta.content
+        if delta:
+            yield delta
+```
+
+### list_docs — what's indexed for this tenant
+
+```toml title="skills/list_docs/skill.toml"
+[skill]
+description  = "List all documents indexed in the tenant's vector store, with chunk counts and metadata."
+is_mcp       = true
+tags         = ["rag"]
+timeout_secs = 30
+```
+
+```python title="skills/list_docs/models.py"
+from harnessapi import SkillInput, SkillOutput
+
+
+class Input(SkillInput):
+    pass
+
+
+class Output(SkillOutput):
+    tenant_id: str
+    document_count: int
+    total_chunks: int
+    documents: list[dict]
+```
+
+---
+
+## Wiring it up — `main.py`
+
+`main.py` builds the app with a `TenantBackend` (multi-tenancy), a middleware that
+copies the tenant id into a `ContextVar` for handlers, and an admin-key check that
+protects the admin MCP.
+
+```python title="main.py"
+import os
+from pathlib import Path
+from starlette.middleware.base import BaseHTTPMiddleware
+from starlette.requests import Request
+from starlette.responses import JSONResponse
+from harnessapi import HarnessAPI
+from harnessapi.multitenancy import TenantBackend, SQLiteStorageBackend, SandboxRegistry
+from skills.shared.context import tenant_id_var
+
+
+class TenantContextMiddleware(BaseHTTPMiddleware):
+    """Copies tenant_id from request.state into a ContextVar for skill handlers."""
+
+    async def dispatch(self, request: Request, call_next):
+        tid = getattr(request.state, "tenant_id", None) or "default"
+        token = tenant_id_var.set(tid)
+        try:
+            return await call_next(request)
+        finally:
+            tenant_id_var.reset(token)
+
+
+async def require_admin_key(request: Request, call_next):
+    key = request.headers.get("X-Admin-Key")
+    expected = os.environ.get("ADMIN_KEY", "dev-secret")
+    if key != expected:
+        return JSONResponse({"detail": "Forbidden — provide X-Admin-Key header"}, status_code=403)
+    return await call_next(request)
+
+
+backend = TenantBackend(
+    tenant_extractor=lambda req: req.headers.get("X-Tenant-ID") or "default",
+    storage=SQLiteStorageBackend(path="./variants.db"),
+    sandbox_registry=SandboxRegistry(),
+    sandbox_provider="local_subprocess",
+    auto_promote=False,
+)
+
+app = HarnessAPI(
+    skills_dir=Path(__file__).parent / "skills",
+    title="Agentic RAG",
+    description="Per-tenant document ingestion and semantic search with harnessapi + multi-tenancy",
+    tenant_backend=backend,
+    enable_admin_mcp=True,
+    admin_mcp_auth=require_admin_key,
+)
+
+app.add_middleware(TenantContextMiddleware)
+```
+
+<Aside type="tip">
+  Skill handlers only receive the `Input` model — never the request. The
+  `TenantContextMiddleware` copies the tenant id (set on `request.state` by
+  harnessapi's `TenantMiddleware`) into a `ContextVar`, so handlers stay testable and
+  read `tenant_id_var.get()` instead of touching the request object.
+</Aside>
+
+---
+
+## Run it
+
+<Steps>
+
+1. **Scaffold the example** (or `cd` into it if you cloned the repo)
+
+   ```bash
+   uv tool install harnessapi      # recommended
+   harnessapi examples agentic-rag # scaffolds into ./agentic-rag/
+   cd agentic-rag
+   ```
+
+2. **Install dependencies**
+
+   ```bash
+   uv sync
+   ```
+
+3. **Set your OpenAI API key**
+
+   ```bash
+   cp .env.example .env
+   # edit .env → OPENAI_API_KEY=sk-...
+   # or: export OPENAI_API_KEY=sk-...
+   ```
+
+4. **Run**
+
+   ```bash
+   harnessapi run
+   # or: uvicorn main:app --reload
+   ```
+
+   On first run, sentence-transformers downloads the embedding model (~90 MB).
+   Subsequent starts are instant.
+
+   ```
+   INFO: Started server process
+   INFO: Discovered skills: ingest, list_docs, search
+   INFO: MCP endpoint:   http://localhost:8000/mcp
+   INFO: Admin MCP:      http://localhost:8000/admin-mcp
+   INFO: Swagger UI:     http://localhost:8000/docs
+   ```
+
+</Steps>
+
+Endpoints exposed: `POST /skills/{ingest,search,list_docs}`, the MCP server at `/mcp`,
+the admin MCP at `/admin-mcp`, the tenant REST API under `/tenants/...`, plus
+`/docs` (Swagger UI) and `/openapi.json`.
+
+---
+
+## End-to-end walkthrough
+
+### 1. Ingest documents for tenant-1
+
+```bash
+curl -X POST http://localhost:8000/skills/ingest \
+  -H "Content-Type: application/json" \
+  -H "Accept: application/json" \
+  -H "X-Tenant-ID: tenant-1" \
+  -d '{
+    "text": "The Apollo program was a series of NASA missions from 1961 to 1972. Apollo 11 landed the first humans on the Moon on July 20, 1969. Neil Armstrong and Buzz Aldrin walked on the lunar surface while Michael Collins orbited above. Six Apollo missions successfully landed on the Moon.",
+    "doc_id": "apollo-history",
+    "metadata": {"title": "Apollo Program", "source": "history-book"}
+  }'
+```
+
+```json
+{"chunks": [
+  "Chunking document 'apollo-history'...",
+  "Created 2 chunks (size=500, overlap=50)",
+  "Embedding chunks...",
+  "Indexed chunks 1–2 / 2",
+  "Done. 2 chunks indexed for doc 'apollo-history' (tenant: tenant-1)"
+]}
+```
+
+### 2. Ingest a different document for tenant-2
+
+```bash
+curl -X POST http://localhost:8000/skills/ingest \
+  -H "Content-Type: application/json" \
+  -H "Accept: application/json" \
+  -H "X-Tenant-ID: tenant-2" \
+  -d '{
+    "text": "The Great Barrier Reef is the world'\''s largest coral reef system, stretching over 2,300 km off Queensland, Australia. It hosts over 1,500 species of fish and is a UNESCO World Heritage Site.",
+    "doc_id": "great-barrier-reef",
+    "metadata": {"title": "Great Barrier Reef", "source": "nature-encyclopedia"}
+  }'
+```
+
+### 3. Search tenant-1 — Apollo results only
+
+```bash
+curl -X POST http://localhost:8000/skills/search \
+  -H "Content-Type: application/json" \
+  -H "Accept: application/json" \
+  -H "X-Tenant-ID: tenant-1" \
+  -d '{"query": "When did humans first land on the Moon?", "top_k": 3}'
+```
+
+```json
+{"chunks": [
+  "Humans first landed on the Moon on **July 20, 1969**, during the Apollo 11 mission.",
+  " Neil Armstrong and Buzz Aldrin descended to the surface while Michael Collins orbited.\n\n",
+  "---\nSources (1 documents):\n",
+  "  • apollo-history (similarity: 0.921) — title: Apollo Program, source: history-book\n"
+]}
+```
+
+### 4. Verify tenant isolation
+
+```bash
+# tenant-2 has no Apollo data — honest "not in context" answer
+curl -X POST http://localhost:8000/skills/search \
+  -H "Content-Type: application/json" \
+  -H "Accept: application/json" \
+  -H "X-Tenant-ID: tenant-2" \
+  -d '{"query": "When did humans first land on the Moon?"}'
+```
+
+Response: `"The context does not contain information about Moon landings..."` — tenant-2
+only sees its reef document.
+
+### 5. List documents per tenant
+
+```bash
+curl -X POST http://localhost:8000/skills/list_docs \
+  -H "Content-Type: application/json" \
+  -H "Accept: application/json" \
+  -H "X-Tenant-ID: tenant-1" \
+  -d '{}'
+```
+
+```json
+{
+  "tenant_id": "tenant-1",
+  "document_count": 1,
+  "total_chunks": 2,
+  "documents": [
+    {"doc_id": "apollo-history", "chunk_count": 2, "title": "Apollo Program", "source": "history-book"}
+  ]
+}
+```
+
+### 6. Streaming with SSE (default)
+
+Drop the `Accept: application/json` header to receive live tokens:
+
+```bash
+curl -X POST http://localhost:8000/skills/search \
+  -H "Content-Type: application/json" \
+  -H "X-Tenant-ID: tenant-1" \
+  -d '{"query": "How many Moon landings were there?"}'
+```
+
+```
+event: chunk
+data: There were
+
+event: chunk
+data:  six successful Apollo Moon landings...
+
+event: done
+data:
+```
+
+---
+
+## Skills as MCP tools
+
+All three skills (`is_mcp = true`) are served at `/mcp`. Add the server to any MCP
+client — Claude Desktop, Claude Code, Cursor:
+
+```json
+{
+  "mcpServers": {
+    "agentic-rag": {
+      "url": "http://localhost:8000/mcp"
+    }
+  }
+}
+```
+
+`ingest`, `search`, and `list_docs` appear as tools. A typical agent flow:
+
+1. *"Ingest this document: [paste text]"* → calls `ingest`
+2. *"What does the document say about X?"* → calls `search`
+3. *"What documents have I ingested?"* → calls `list_docs`
+
+For single-user setups, requests use the `"default"` tenant. Pass an `X-Tenant-ID`
+header (if your client supports custom headers) to scope to a specific tenant.
+
+---
+
+## Admin MCP — per-tenant skill customization
+
+The admin MCP at `/admin-mcp` exposes tenant management as MCP **tools**, so an agent
+can clone a skill, push a modified handler, test it, and promote it — all without
+redeploying. The **same operations** are also available as a REST API under
+`/tenants/...` for scripts and CI.
+
+<Aside type="caution">
+  The admin MCP can execute validated handler source on the server. It ships with **no
+  built-in authentication** — always protect `/admin-mcp` with auth middleware in
+  production. This example wires `admin_mcp_auth=require_admin_key`, which requires an
+  `X-Admin-Key` header (default `dev-secret`, override with the `ADMIN_KEY` env var).
+</Aside>
+
+Add the admin server to your MCP client with the key:
+
+```json
+{
+  "mcpServers": {
+    "agentic-rag-admin": {
+      "url": "http://localhost:8000/admin-mcp",
+      "headers": {"X-Admin-Key": "dev-secret"}
+    }
+  }
+}
+```
+
+### Admin MCP tools
+
+| Tool | Arguments | Purpose |
+|------|-----------|---------|
+| `clone_skill` | `tenant_id`, `skill_name` | Copy a base skill's handler source as a starting point |
+| `customize_skill` | `tenant_id`, `skill_name`, `source_code`, `auto_promote=False`, `meta_overrides=None` | Submit modified handler source; validates and stores the variant |
+| `promote_variant` | `tenant_id`, `skill_name`, `variant_id` | Make a variant the active handler for the tenant's skill |
+| `demote_variant` | `tenant_id`, `skill_name`, `variant_id` | Move a promoted variant back to sandbox status |
+| `preview_variant` | `tenant_id`, `skill_name`, `variant_id` | Route real tenant calls to the variant without full promotion |
+| `run_variant` | `tenant_id`, `skill_name`, `variant_id`, `input_data` | Test a variant with input (sandbox if provisioned, else in-process) |
+| `get_variant_source` | `tenant_id`, `skill_name`, `variant_id` | Return a variant's handler source |
+| `list_tenant_skills` | `tenant_id` | List all variants (sandbox + promoted) for a tenant |
+| `provision_sandbox` | `tenant_id`, `skills_dir=""` | Provision an isolated subprocess sandbox; returns its endpoint URL |
+| `teardown_sandbox` | `tenant_id` | Tear down a tenant's sandbox |
+| `sandbox_health` | `tenant_id` | Check a tenant's sandbox health |
+| `push_to_sandbox` | `tenant_id`, `skill_name` | Push the promoted variant's handler source to the sandbox |
+
+### Variant lifecycle via the REST tenant API
+
+The same flow with `curl`. Customize the `search` skill for `tenant-1` (e.g. a
+different system prompt), test it, then promote it — `tenant-2` is unaffected.
+
+<Steps>
+
+1. **Clone** the base skill to create an editable variant
+
+   ```bash
+   curl -X POST http://localhost:8000/tenants/tenant-1/skills/search/clone \
+     -H "X-Admin-Key: dev-secret"
+   ```
+
+2. **Customize** — submit modified handler source. With `auto_promote: false` the
+   variant is stored but not yet live.
+
+   ```bash
+   curl -X POST http://localhost:8000/tenants/tenant-1/skills/search/customize \
+     -H "Content-Type: application/json" \
+     -H "X-Admin-Key: dev-secret" \
+     -d '{
+       "source_code": "async def handle(input):\n    ...customized handler...\n",
+       "auto_promote": false,
+       "meta_overrides": {}
+     }'
+   ```
+
+3. **Find the variant id**
+
+   ```bash
+   curl http://localhost:8000/tenants/tenant-1/skills/search/variants \
+     -H "X-Admin-Key: dev-secret"
+   ```
+
+4. **Test it** without affecting live traffic
+
+   ```bash
+   curl -X POST http://localhost:8000/tenants/tenant-1/skills/search/variants/<variant_id>/run \
+     -H "Content-Type: application/json" \
+     -H "X-Admin-Key: dev-secret" \
+     -d '{"query": "Apollo mission details"}'
+   ```
+
+5. **Preview** (route real `tenant-1` calls to the variant) or **promote** (make it the
+   active handler)
+
+   ```bash
+   curl -X POST http://localhost:8000/tenants/tenant-1/skills/search/variants/<variant_id>/promote \
+     -H "X-Admin-Key: dev-secret"
+   ```
+
+</Steps>
+
+After promotion, every `tenant-1` call to `/skills/search` runs the customized handler;
+all other tenants keep the base handler. harnessapi resolves the handler for each
+request in this order: **sandbox → promoted variant → preview variant → base skill**.
+
+---
+
+## Per-tenant sandboxes
+
+Sandboxes run a tenant's handler in an **isolated subprocess** (the example sets
+`sandbox_provider="local_subprocess"`). They are managed through the **admin MCP tools**
+— there is no REST sandbox route. The typical flow:
+
+<Steps>
+
+1. `provision_sandbox(tenant_id="tenant-1")` — start the subprocess, register its
+   endpoint.
+2. `push_to_sandbox(tenant_id="tenant-1", skill_name="search")` — push the promoted (or
+   base) handler source into it.
+3. `run_variant(...)` or a normal `/skills/search` call from `tenant-1` is now forwarded
+   to the sandbox.
+4. `sandbox_health(tenant_id="tenant-1")` — check it's reachable.
+5. `teardown_sandbox(tenant_id="tenant-1")` — shut it down.
+
+</Steps>
+
+---
+
+## Tenant REST API reference
+
+All routes below are mounted under the `/tenants` prefix (require `X-Admin-Key` in this
+example):
+
+| Method | Route | Purpose |
+|--------|-------|---------|
+| `POST` | `/tenants/{tenant_id}/skills/{skill_name}/clone` | Clone a base skill |
+| `POST` | `/tenants/{tenant_id}/skills/{skill_name}/customize` | Store a customized handler (`source_code`) |
+| `POST` | `/tenants/{tenant_id}/skills/{skill_name}/variants/{variant_id}/promote` | Make the variant active |
+| `POST` | `/tenants/{tenant_id}/skills/{skill_name}/variants/{variant_id}/demote` | Return variant to sandbox status |
+| `POST` | `/tenants/{tenant_id}/skills/{skill_name}/variants/{variant_id}/preview` | Route real calls to the variant |
+| `POST` | `/tenants/{tenant_id}/skills/{skill_name}/variants/{variant_id}/run` | Test a variant with input |
+| `DELETE` | `/tenants/{tenant_id}/skills/{skill_name}/variants/{variant_id}` | Delete a variant |
+| `GET` | `/tenants/{tenant_id}/skills` | List all variants for a tenant |
+| `GET` | `/tenants/{tenant_id}/skills/{skill_name}/variants` | List variants for one skill |
+| `GET` | `/tenants/{tenant_id}/skills/{skill_name}/variants/{variant_id}/source` | Get a variant's source |
+
+---
+
+## Environment variables
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `OPENAI_API_KEY` | *(required)* | OpenAI API key for the `search` skill |
+| `OPENAI_MODEL` | `gpt-4o` | Model used for answer generation |
+| `CHROMA_PATH` | `./chroma_data` | Directory for ChromaDB persistence |
+| `ADMIN_KEY` | `dev-secret` | Key required for `/admin-mcp` and the `/tenants` API |
+
+<Aside type="tip">
+  Re-ingesting the same `doc_id` is idempotent — the `ingest` handler deletes existing
+  chunks for that `doc_id` before upserting, so it replaces rather than duplicates.
+</Aside>
