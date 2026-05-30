@@ -464,20 +464,20 @@ Add the admin server to your MCP client with the key:
 
 ### Admin MCP tools
 
-| Tool | Arguments | Purpose |
-|------|-----------|---------|
-| `clone_skill` | `tenant_id`, `skill_name` | Copy a base skill's handler source as a starting point |
-| `customize_skill` | `tenant_id`, `skill_name`, `source_code`, `auto_promote=False`, `meta_overrides=None` | Submit modified handler source; validates and stores the variant |
-| `promote_variant` | `tenant_id`, `skill_name`, `variant_id` | Make a variant the active handler for the tenant's skill |
-| `demote_variant` | `tenant_id`, `skill_name`, `variant_id` | Move a promoted variant back to sandbox status |
-| `preview_variant` | `tenant_id`, `skill_name`, `variant_id` | Route real tenant calls to the variant without full promotion |
-| `run_variant` | `tenant_id`, `skill_name`, `variant_id`, `input_data` | Test a variant with input (sandbox if provisioned, else in-process) |
-| `get_variant_source` | `tenant_id`, `skill_name`, `variant_id` | Return a variant's handler source |
-| `list_tenant_skills` | `tenant_id` | List all variants (sandbox + promoted) for a tenant |
-| `provision_sandbox` | `tenant_id`, `skills_dir=""` | Provision an isolated subprocess sandbox; returns its endpoint URL |
-| `teardown_sandbox` | `tenant_id` | Tear down a tenant's sandbox |
-| `sandbox_health` | `tenant_id` | Check a tenant's sandbox health |
-| `push_to_sandbox` | `tenant_id`, `skill_name` | Push the promoted variant's handler source to the sandbox |
+| Tool | Arguments | Purpose | Sample prompt |
+|------|-----------|---------|---------------|
+| `clone_skill` | `tenant_id`, `skill_name` | Copy a base skill's handler source as a starting point | *"Clone the search skill for tenant-1 so I can customize it."* |
+| `customize_skill` | `tenant_id`, `skill_name`, `source_code`, `auto_promote=False`, `meta_overrides=None` | Submit modified handler source; validates and stores the variant | *"For tenant-1's search skill, use a friendlier system prompt and switch the model to gpt-4o-mini."* |
+| `promote_variant` | `tenant_id`, `skill_name`, `variant_id` | Make a variant the active handler for the tenant's skill | *"Promote tenant-1's new search variant to live."* |
+| `demote_variant` | `tenant_id`, `skill_name`, `variant_id` | Move a promoted variant back to sandbox status | *"Roll tenant-1's search back to the previous handler."* |
+| `preview_variant` | `tenant_id`, `skill_name`, `variant_id` | Route real tenant calls to the variant without full promotion | *"Preview the new search variant for tenant-1 on real traffic before I commit."* |
+| `run_variant` | `tenant_id`, `skill_name`, `variant_id`, `input_data` | Test a variant with input (sandbox if provisioned, else in-process) | *"Test tenant-1's search variant with the query 'Apollo mission details'."* |
+| `get_variant_source` | `tenant_id`, `skill_name`, `variant_id` | Return a variant's handler source | *"Show me the handler source for tenant-1's search variant."* |
+| `list_tenant_skills` | `tenant_id` | List all variants (sandbox + promoted) for a tenant | *"What skill variants does tenant-1 have right now?"* |
+| `provision_sandbox` | `tenant_id`, `skills_dir=""` | Provision an isolated subprocess sandbox; returns its endpoint URL | *"Spin up a sandbox for tenant-1."* |
+| `teardown_sandbox` | `tenant_id` | Tear down a tenant's sandbox | *"Shut down tenant-1's sandbox."* |
+| `sandbox_health` | `tenant_id` | Check a tenant's sandbox health | *"Is tenant-1's sandbox healthy?"* |
+| `push_to_sandbox` | `tenant_id`, `skill_name` | Push the promoted variant's handler source to the sandbox | *"Push tenant-1's promoted search handler into its sandbox."* |
 
 ### Variant lifecycle via the REST tenant API
 
