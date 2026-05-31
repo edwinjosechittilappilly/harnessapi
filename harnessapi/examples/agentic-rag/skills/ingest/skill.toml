@@ -1,5 +1,5 @@
 [skill]
 description  = "Ingest a document into the tenant's vector store. Chunks, embeds, and indexes the text for semantic search."
 is_mcp       = true
-tags         = ["rag", "ingest", "vector-store"]
+tags         = ["rag"]
 timeout_secs = 120

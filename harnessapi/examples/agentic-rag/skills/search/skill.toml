@@ -1,5 +1,5 @@
 [skill]
 description  = "Search the tenant's document store with a natural language query and get a GPT-4o generated answer with sources."
 is_mcp       = true
-tags         = ["rag", "search", "llm"]
+tags         = ["rag"]
 timeout_secs = 60

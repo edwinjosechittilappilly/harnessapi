@@ -66,6 +66,7 @@ export default defineConfig({
             { label: 'Summarizer — LLM skill', slug: 'examples/summarizer' },
             { label: 'Web scraper', slug: 'examples/web-scraper' },
             { label: 'Image captioner', slug: 'examples/image-captioner' },
+            { label: 'Agentic RAG — multi-tenancy', slug: 'examples/agentic-rag' },
           ],
         },
         {
@@ -116,6 +117,48 @@ export default defineConfig({
         {
           tag: 'meta',
           attrs: { name: 'twitter:image', content: 'https://raw.githubusercontent.com/edwinjosechittilappilly/harnessapi/main/assets/banner.png' },
+        },
+        // Open Graph site-level metadata (per-page og:title/description/url are emitted by Starlight).
+        { tag: 'meta', attrs: { property: 'og:type', content: 'website' } },
+        { tag: 'meta', attrs: { property: 'og:site_name', content: 'harnessapi' } },
+        { tag: 'meta', attrs: { property: 'og:locale', content: 'en_US' } },
+        // Structured data — WebSite (with site search) + SoftwareSourceCode for the project.
+        {
+          tag: 'script',
+          attrs: { type: 'application/ld+json' },
+          content: JSON.stringify({
+            '@context': 'https://schema.org',
+            '@type': 'WebSite',
+            name: 'harnessapi',
+            url: 'https://edwinjosechittilappilly.github.io/harnessapi/',
+            description:
+              'Python framework to build streaming APIs and MCP tools from skill folders. Write a skill. Get an API. Get an MCP tool. Ship.',
+            inLanguage: 'en',
+            potentialAction: {
+              '@type': 'SearchAction',
+              target:
+                'https://edwinjosechittilappilly.github.io/harnessapi/?q={search_term_string}',
+              'query-input': 'required name=search_term_string',
+            },
+          }),
+        },
+        {
+          tag: 'script',
+          attrs: { type: 'application/ld+json' },
+          content: JSON.stringify({
+            '@context': 'https://schema.org',
+            '@type': 'SoftwareSourceCode',
+            name: 'harnessapi',
+            description:
+              'Skill-first Python framework built on FastAPI and FastMCP that turns a skill folder into a streaming HTTP API and an MCP tool simultaneously.',
+            url: 'https://edwinjosechittilappilly.github.io/harnessapi/',
+            codeRepository: 'https://github.com/edwinjosechittilappilly/harnessapi',
+            programmingLanguage: 'Python',
+            runtimePlatform: 'Python 3.11+',
+            license: 'https://opensource.org/licenses/MIT',
+            applicationCategory: 'DeveloperApplication',
+            operatingSystem: 'Cross-platform',
+          }),
         },
         {
           tag: 'link',
